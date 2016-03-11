@@ -1327,13 +1327,15 @@ SimpleMDE.prototype.createToolbar = function(items) {
         if ((items[i].name == "fullscreen" || items[i].name == "side-by-side") && isMobile())
             continue;
 
-
         // Don't include trailing separators
         if (items[i] === "|") {
             var nonSeparatorIconsFollow = false;
 
             for (var x = (i + 1); x < items.length; x++) {
-                if (items[x] !== "|") {
+                console.log(items[x]);
+                if (items[x] !== "|" &&
+                  (!self.options.hideIcons || self.options.hideIcons.indexOf(items[x].name) === -1)) {
+
                     nonSeparatorIconsFollow = true;
                 }
             }
