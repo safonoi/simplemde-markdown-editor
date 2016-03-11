@@ -5,881 +5,6 @@
  * @license MIT
  */
 (function(f){if(typeof exports==="object"&&typeof module!=="undefined"){module.exports=f()}else if(typeof define==="function"&&define.amd){define([],f)}else{var g;if(typeof window!=="undefined"){g=window}else if(typeof global!=="undefined"){g=global}else if(typeof self!=="undefined"){g=self}else{g=this}g.SimpleMDE = f()}})(function(){var define,module,exports;return (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
-(function (global){
-
-; Typo = global.Typo = require("D:\\My Web Sites\\simplemde-markdown-editor\\node_modules\\codemirror-spell-checker\\src\\js\\typo.js");
-CodeMirror = global.CodeMirror = require("codemirror");
-; var __browserify_shim_require__=require;(function browserifyShim(module, define, require) {
-// Initialize data globally to reduce memory consumption
-var num_loaded = 0;
-var aff_loading = false;
-var dic_loading = false;
-var aff_data = "";
-var dic_data = "";
-var typo;
-
-
-CodeMirror.defineMode("spell-checker", function(config, parserConfig) {
-	// Load AFF/DIC data
-	if(!aff_loading){
-		aff_loading = true;
-		var xhr_aff = new XMLHttpRequest();
-		xhr_aff.open("GET", "https://cdn.jsdelivr.net/codemirror.spell-checker/latest/en_US.aff", true);
-		xhr_aff.onload = function (e) {
-			if (xhr_aff.readyState === 4 && xhr_aff.status === 200) {
-				aff_data = xhr_aff.responseText;
-				num_loaded++;
-				
-				if(num_loaded == 2){
-					typo = new Typo("en_US", aff_data, dic_data, {
-						platform: 'any'
-					});
-				}
-			}
-		};
-		xhr_aff.send(null);
-	}
-	
-	if(!dic_loading){
-		dic_loading = true;
-		var xhr_dic = new XMLHttpRequest();
-		xhr_dic.open("GET", "https://cdn.jsdelivr.net/codemirror.spell-checker/latest/en_US.dic", true);
-		xhr_dic.onload = function (e) {
-			if (xhr_dic.readyState === 4 && xhr_dic.status === 200) {
-				dic_data = xhr_dic.responseText;
-				num_loaded++;
-				
-				if(num_loaded == 2){
-					typo = new Typo("en_US", aff_data, dic_data, {
-						platform: 'any'
-					});
-				}
-			}
-		};
-		xhr_dic.send(null);
-	}
-
-	
-	
-	// Define what separates a word
-	var rx_word = "!\"#$%&()*+,-./:;<=>?@[\\]^_`{|}~ ";
-	
-	
-	// Create the overlay and such
-	var overlay = {
-		token: function(stream, state) {
-			var ch = stream.peek();
-			var word = "";
-
-			if(rx_word.includes(ch)) {
-				stream.next();
-				return null;
-			}
-
-			while((ch = stream.peek()) != null && !rx_word.includes(ch)) {
-				word += ch;
-				stream.next();
-			}
-
-			if(typo && !typo.check(word))
-				return "spell-error"; // CSS class: cm-spell-error
-
-			return null;
-		}
-	};
-
-	var mode = CodeMirror.getMode(
-		config, config.backdrop || "text/plain"
-	);
-
-	return CodeMirror.overlayMode(mode, overlay, true);
-});
-
-
-// Because some browsers don't support this functionality yet
-if(!String.prototype.includes) {
-	String.prototype.includes = function() {'use strict';
-		return String.prototype.indexOf.apply(this, arguments) !== -1;
-	};
-}
-}).call(global, module, undefined, undefined);
-
-}).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"D:\\My Web Sites\\simplemde-markdown-editor\\node_modules\\codemirror-spell-checker\\src\\js\\typo.js":2,"codemirror":7}],2:[function(require,module,exports){
-(function (global){
-; var __browserify_shim_require__=require;(function browserifyShim(module, exports, require, define, browserify_shim__define__module__export__) {
-'use strict';
-
-/**
- * Typo is a JavaScript implementation of a spellchecker using hunspell-style
- * dictionaries.
- */
-
-/**
- * Typo constructor.
- *
- * @param {String} [dictionary] The locale code of the dictionary being used. e.g.,
- *                              "en_US". This is only used to auto-load dictionaries.
- * @param {String} [affData] The data from the dictionary's .aff file. If omitted
- *                           and the first argument is supplied, in "chrome" platform,
- *                           the .aff file will be loaded automatically from
- *                           lib/typo/dictionaries/[dictionary]/[dictionary].aff
- *                           In other platform, it will be loaded from
- *                           [setting.path]/dictionaries/[dictionary]/[dictionary].aff
- * @param {String} [wordsData] The data from the dictionary's .dic file. If omitted,
- *                           and the first argument is supplied, in "chrome" platform,
- *                           the .dic file will be loaded automatically from
- *                           lib/typo/dictionaries/[dictionary]/[dictionary].dic
- *                           In other platform, it will be loaded from
- *                           [setting.path]/dictionaries/[dictionary]/[dictionary].dic
- * @param {Object} [settings] Constructor settings. Available properties are:
- *                            {String} [platform]: "chrome" for Chrome Extension or other
- *                              value for the usual web.
- *                            {String} [dictionaryPath]: path to load dictionary from in non-chrome
- *                              environment.
- *                            {Object} [flags]: flag information.
- *
- *
- * @returns {Typo} A Typo object.
- */
-
-var Typo = function (dictionary, affData, wordsData, settings) {
-	settings = settings || {};
-	
-	/** Determines the method used for auto-loading .aff and .dic files. **/
-	this.platform = settings.platform || "chrome";
-	
-	this.dictionary = null;
-	
-	this.rules = {};
-	this.dictionaryTable = {};
-	
-	this.compoundRules = [];
-	this.compoundRuleCodes = {};
-	
-	this.replacementTable = [];
-	
-	this.flags = settings.flags || {};
-	
-	if (dictionary) {
-		this.dictionary = dictionary;
-		
-		if (this.platform == "chrome") {
-			if (!affData) affData = this._readFile(chrome.extension.getURL("lib/typo/dictionaries/" + dictionary + "/" + dictionary + ".aff"));
-			if (!wordsData) wordsData = this._readFile(chrome.extension.getURL("lib/typo/dictionaries/" + dictionary + "/" + dictionary + ".dic"));
-		} else {
-			var path = settings.dictionaryPath || '';
-			
-			if (!affData) affData = this._readFile(path + "/" + dictionary + "/" + dictionary + ".aff");
-			if (!wordsData) wordsData = this._readFile(path + "/" + dictionary + "/" + dictionary + ".dic");
-		}
-		
-		this.rules = this._parseAFF(affData);
-		
-		// Save the rule codes that are used in compound rules.
-		this.compoundRuleCodes = {};
-		
-		for (var i = 0, _len = this.compoundRules.length; i < _len; i++) {
-			var rule = this.compoundRules[i];
-			
-			for (var j = 0, _jlen = rule.length; j < _jlen; j++) {
-				this.compoundRuleCodes[rule[j]] = [];
-			}
-		}
-		
-		// If we add this ONLYINCOMPOUND flag to this.compoundRuleCodes, then _parseDIC
-		// will do the work of saving the list of words that are compound-only.
-		if ("ONLYINCOMPOUND" in this.flags) {
-			this.compoundRuleCodes[this.flags.ONLYINCOMPOUND] = [];
-		}
-		
-		this.dictionaryTable = this._parseDIC(wordsData);
-		
-		// Get rid of any codes from the compound rule codes that are never used
-		// (or that were special regex characters).  Not especially necessary...
-		for (var i in this.compoundRuleCodes) {
-			if (this.compoundRuleCodes[i].length == 0) {
-				delete this.compoundRuleCodes[i];
-			}
-		}
-		
-		// Build the full regular expressions for each compound rule.
-		// I have a feeling (but no confirmation yet) that this method of
-		// testing for compound words is probably slow.
-		for (var i = 0, _len = this.compoundRules.length; i < _len; i++) {
-			var ruleText = this.compoundRules[i];
-			
-			var expressionText = "";
-			
-			for (var j = 0, _jlen = ruleText.length; j < _jlen; j++) {
-				var character = ruleText[j];
-				
-				if (character in this.compoundRuleCodes) {
-					expressionText += "(" + this.compoundRuleCodes[character].join("|") + ")";
-				}
-				else {
-					expressionText += character;
-				}
-			}
-			
-			this.compoundRules[i] = new RegExp(expressionText, "i");
-		}
-	}
-	
-	return this;
-};
-
-Typo.prototype = {
-	/**
-	 * Loads a Typo instance from a hash of all of the Typo properties.
-	 *
-	 * @param object obj A hash of Typo properties, probably gotten from a JSON.parse(JSON.stringify(typo_instance)).
-	 */
-	
-	load : function (obj) {
-		for (var i in obj) {
-			this[i] = obj[i];
-		}
-		
-		return this;
-	},
-	
-	/**
-	 * Read the contents of a file.
-	 *
-	 * @param {String} path The path (relative) to the file.
-	 * @param {String} [charset="ISO8859-1"] The expected charset of the file
-	 * @returns string The file data.
-	 */
-	
-	_readFile : function (path, charset) {
-		if (!charset) charset = "ISO8859-1";
-		
-		var req = new XMLHttpRequest();
-		req.open("GET", path, false);
-		
-		if (req.overrideMimeType)
-			req.overrideMimeType("text/plain; charset=" + charset);
-		
-		req.send(null);
-		
-		return req.responseText;
-	},
-	
-	/**
-	 * Parse the rules out from a .aff file.
-	 *
-	 * @param {String} data The contents of the affix file.
-	 * @returns object The rules from the file.
-	 */
-	
-	_parseAFF : function (data) {
-		var rules = {};
-		
-		// Remove comment lines
-		data = this._removeAffixComments(data);
-		
-		var lines = data.split("\n");
-		
-		for (var i = 0, _len = lines.length; i < _len; i++) {
-			var line = lines[i];
-			
-			var definitionParts = line.split(/\s+/);
-			
-			var ruleType = definitionParts[0];
-			
-			if (ruleType == "PFX" || ruleType == "SFX") {
-				var ruleCode = definitionParts[1];
-				var combineable = definitionParts[2];
-				var numEntries = parseInt(definitionParts[3], 10);
-				
-				var entries = [];
-				
-				for (var j = i + 1, _jlen = i + 1 + numEntries; j < _jlen; j++) {
-					var line = lines[j];
-					
-					var lineParts = line.split(/\s+/);
-					var charactersToRemove = lineParts[2];
-					
-					var additionParts = lineParts[3].split("/");
-					
-					var charactersToAdd = additionParts[0];
-					if (charactersToAdd === "0") charactersToAdd = "";
-					
-					var continuationClasses = this.parseRuleCodes(additionParts[1]);
-					
-					var regexToMatch = lineParts[4];
-					
-					var entry = {};
-					entry.add = charactersToAdd;
-					
-					if (continuationClasses.length > 0) entry.continuationClasses = continuationClasses;
-					
-					if (regexToMatch !== ".") {
-						if (ruleType === "SFX") {
-							entry.match = new RegExp(regexToMatch + "$");
-						}
-						else {
-							entry.match = new RegExp("^" + regexToMatch);
-						}
-					}
-					
-					if (charactersToRemove != "0") {
-						if (ruleType === "SFX") {
-							entry.remove = new RegExp(charactersToRemove  + "$");
-						}
-						else {
-							entry.remove = charactersToRemove;
-						}
-					}
-					
-					entries.push(entry);
-				}
-				
-				rules[ruleCode] = { "type" : ruleType, "combineable" : (combineable == "Y"), "entries" : entries };
-				
-				i += numEntries;
-			}
-			else if (ruleType === "COMPOUNDRULE") {
-				var numEntries = parseInt(definitionParts[1], 10);
-				
-				for (var j = i + 1, _jlen = i + 1 + numEntries; j < _jlen; j++) {
-					var line = lines[j];
-					
-					var lineParts = line.split(/\s+/);
-					this.compoundRules.push(lineParts[1]);
-				}
-				
-				i += numEntries;
-			}
-			else if (ruleType === "REP") {
-				var lineParts = line.split(/\s+/);
-				
-				if (lineParts.length === 3) {
-					this.replacementTable.push([ lineParts[1], lineParts[2] ]);
-				}
-			}
-			else {
-				// ONLYINCOMPOUND
-				// COMPOUNDMIN
-				// FLAG
-				// KEEPCASE
-				// NEEDAFFIX
-				
-				this.flags[ruleType] = definitionParts[1];
-			}
-		}
-		
-		return rules;
-	},
-	
-	/**
-	 * Removes comment lines and then cleans up blank lines and trailing whitespace.
-	 *
-	 * @param {String} data The data from an affix file.
-	 * @return {String} The cleaned-up data.
-	 */
-	
-	_removeAffixComments : function (data) {
-		// Remove comments
-		data = data.replace(/#.*$/mg, "");
-		
-		// Trim each line
-		data = data.replace(/^\s\s*/m, '').replace(/\s\s*$/m, '');
-		
-		// Remove blank lines.
-		data = data.replace(/\n{2,}/g, "\n");
-		
-		// Trim the entire string
-		data = data.replace(/^\s\s*/, '').replace(/\s\s*$/, '');
-		
-		return data;
-	},
-	
-	/**
-	 * Parses the words out from the .dic file.
-	 *
-	 * @param {String} data The data from the dictionary file.
-	 * @returns object The lookup table containing all of the words and
-	 *                 word forms from the dictionary.
-	 */
-	
-	_parseDIC : function (data) {
-		data = this._removeDicComments(data);
-		
-		var lines = data.split("\n");
-		var dictionaryTable = {};
-		
-		function addWord(word, rules) {
-			// Some dictionaries will list the same word multiple times with different rule sets.
-			if (!(word in dictionaryTable) || typeof dictionaryTable[word] != 'object') {
-				dictionaryTable[word] = [];
-			}
-			
-			dictionaryTable[word].push(rules);
-		}
-		
-		// The first line is the number of words in the dictionary.
-		for (var i = 1, _len = lines.length; i < _len; i++) {
-			var line = lines[i];
-			
-			var parts = line.split("/", 2);
-			
-			var word = parts[0];
-
-			// Now for each affix rule, generate that form of the word.
-			if (parts.length > 1) {
-				var ruleCodesArray = this.parseRuleCodes(parts[1]);
-				
-				// Save the ruleCodes for compound word situations.
-				if (!("NEEDAFFIX" in this.flags) || ruleCodesArray.indexOf(this.flags.NEEDAFFIX) == -1) {
-					addWord(word, ruleCodesArray);
-				}
-				
-				for (var j = 0, _jlen = ruleCodesArray.length; j < _jlen; j++) {
-					var code = ruleCodesArray[j];
-					
-					var rule = this.rules[code];
-					
-					if (rule) {
-						var newWords = this._applyRule(word, rule);
-						
-						for (var ii = 0, _iilen = newWords.length; ii < _iilen; ii++) {
-							var newWord = newWords[ii];
-							
-							addWord(newWord, []);
-							
-							if (rule.combineable) {
-								for (var k = j + 1; k < _jlen; k++) {
-									var combineCode = ruleCodesArray[k];
-									
-									var combineRule = this.rules[combineCode];
-									
-									if (combineRule) {
-										if (combineRule.combineable && (rule.type != combineRule.type)) {
-											var otherNewWords = this._applyRule(newWord, combineRule);
-											
-											for (var iii = 0, _iiilen = otherNewWords.length; iii < _iiilen; iii++) {
-												var otherNewWord = otherNewWords[iii];
-												addWord(otherNewWord, []);
-											}
-										}
-									}
-								}
-							}
-						}
-					}
-					
-					if (code in this.compoundRuleCodes) {
-						this.compoundRuleCodes[code].push(word);
-					}
-				}
-			}
-			else {
-				addWord(word.trim(), []);
-			}
-		}
-		
-		return dictionaryTable;
-	},
-	
-	
-	/**
-	 * Removes comment lines and then cleans up blank lines and trailing whitespace.
-	 *
-	 * @param {String} data The data from a .dic file.
-	 * @return {String} The cleaned-up data.
-	 */
-	
-	_removeDicComments : function (data) {
-		// I can't find any official documentation on it, but at least the de_DE
-		// dictionary uses tab-indented lines as comments.
-		
-		// Remove comments
-		data = data.replace(/^\t.*$/mg, "");
-		
-		return data;
-		
-		// Trim each line
-		data = data.replace(/^\s\s*/m, '').replace(/\s\s*$/m, '');
-		
-		// Remove blank lines.
-		data = data.replace(/\n{2,}/g, "\n");
-		
-		// Trim the entire string
-		data = data.replace(/^\s\s*/, '').replace(/\s\s*$/, '');
-		
-		return data;
-	},
-	
-	parseRuleCodes : function (textCodes) {
-		if (!textCodes) {
-			return [];
-		}
-		else if (!("FLAG" in this.flags)) {
-			return textCodes.split("");
-		}
-		else if (this.flags.FLAG === "long") {
-			var flags = [];
-			
-			for (var i = 0, _len = textCodes.length; i < _len; i += 2) {
-				flags.push(textCodes.substr(i, 2));
-			}
-			
-			return flags;
-		}
-		else if (this.flags.FLAG === "num") {
-			return textCode.split(",");
-		}
-	},
-	
-	/**
-	 * Applies an affix rule to a word.
-	 *
-	 * @param {String} word The base word.
-	 * @param {Object} rule The affix rule.
-	 * @returns {String[]} The new words generated by the rule.
-	 */
-	
-	_applyRule : function (word, rule) {
-		var entries = rule.entries;
-		var newWords = [];
-		
-		for (var i = 0, _len = entries.length; i < _len; i++) {
-			var entry = entries[i];
-			
-			if (!entry.match || word.match(entry.match)) {
-				var newWord = word;
-				
-				if (entry.remove) {
-					newWord = newWord.replace(entry.remove, "");
-				}
-				
-				if (rule.type === "SFX") {
-					newWord = newWord + entry.add;
-				}
-				else {
-					newWord = entry.add + newWord;
-				}
-				
-				newWords.push(newWord);
-				
-				if ("continuationClasses" in entry) {
-					for (var j = 0, _jlen = entry.continuationClasses.length; j < _jlen; j++) {
-						var continuationRule = this.rules[entry.continuationClasses[j]];
-						
-						if (continuationRule) {
-							newWords = newWords.concat(this._applyRule(newWord, continuationRule));
-						}
-						/*
-						else {
-							// This shouldn't happen, but it does, at least in the de_DE dictionary.
-							// I think the author mistakenly supplied lower-case rule codes instead
-							// of upper-case.
-						}
-						*/
-					}
-				}
-			}
-		}
-		
-		return newWords;
-	},
-	
-	/**
-	 * Checks whether a word or a capitalization variant exists in the current dictionary.
-	 * The word is trimmed and several variations of capitalizations are checked.
-	 * If you want to check a word without any changes made to it, call checkExact()
-	 *
-	 * @see http://blog.stevenlevithan.com/archives/faster-trim-javascript re:trimming function
-	 *
-	 * @param {String} aWord The word to check.
-	 * @returns {Boolean}
-	 */
-	
-	check : function (aWord) {
-		// Remove leading and trailing whitespace
-		var trimmedWord = aWord.replace(/^\s\s*/, '').replace(/\s\s*$/, '');
-		
-		if (this.checkExact(trimmedWord)) {
-			return true;
-		}
-		
-		// The exact word is not in the dictionary.
-		if (trimmedWord.toUpperCase() === trimmedWord) {
-			// The word was supplied in all uppercase.
-			// Check for a capitalized form of the word.
-			var capitalizedWord = trimmedWord[0] + trimmedWord.substring(1).toLowerCase();
-			
-			if (this.hasFlag(capitalizedWord, "KEEPCASE")) {
-				// Capitalization variants are not allowed for this word.
-				return false;
-			}
-			
-			if (this.checkExact(capitalizedWord)) {
-				return true;
-			}
-		}
-		
-		var lowercaseWord = trimmedWord.toLowerCase();
-		
-		if (lowercaseWord !== trimmedWord) {
-			if (this.hasFlag(lowercaseWord, "KEEPCASE")) {
-				// Capitalization variants are not allowed for this word.
-				return false;
-			}
-			
-			// Check for a lowercase form
-			if (this.checkExact(lowercaseWord)) {
-				return true;
-			}
-		}
-		
-		return false;
-	},
-	
-	/**
-	 * Checks whether a word exists in the current dictionary.
-	 *
-	 * @param {String} word The word to check.
-	 * @returns {Boolean}
-	 */
-	
-	checkExact : function (word) {
-		var ruleCodes = this.dictionaryTable[word];
-		
-		if (typeof ruleCodes === 'undefined') {
-			// Check if this might be a compound word.
-			if ("COMPOUNDMIN" in this.flags && word.length >= this.flags.COMPOUNDMIN) {
-				for (var i = 0, _len = this.compoundRules.length; i < _len; i++) {
-					if (word.match(this.compoundRules[i])) {
-						return true;
-					}
-				}
-			}
-			
-			return false;
-		}
-		else {
-			for (var i = 0, _len = ruleCodes.length; i < _len; i++) {
-				if (!this.hasFlag(word, "ONLYINCOMPOUND", ruleCodes[i])) {
-					return true;
-				}
-			}
-			
-			return false;
-		}
-	},
-	
-	/**
-	 * Looks up whether a given word is flagged with a given flag.
-	 *
-	 * @param {String} word The word in question.
-	 * @param {String} flag The flag in question.
-	 * @return {Boolean}
-	 */
-	 
-	hasFlag : function (word, flag, wordFlags) {
-		if (flag in this.flags) {
-			if (typeof wordFlags === 'undefined') {
-				var wordFlags = Array.prototype.concat.apply([], this.dictionaryTable[word]);
-			}
-			
-			if (wordFlags && wordFlags.indexOf(this.flags[flag]) !== -1) {
-				return true;
-			}
-		}
-		
-		return false;
-	},
-	
-	/**
-	 * Returns a list of suggestions for a misspelled word.
-	 *
-	 * @see http://www.norvig.com/spell-correct.html for the basis of this suggestor.
-	 * This suggestor is primitive, but it works.
-	 *
-	 * @param {String} word The misspelling.
-	 * @param {Number} [limit=5] The maximum number of suggestions to return.
-	 * @returns {String[]} The array of suggestions.
-	 */
-	
-	alphabet : "",
-	
-	suggest : function (word, limit) {
-		if (!limit) limit = 5;
-		
-		if (this.check(word)) return [];
-		
-		// Check the replacement table.
-		for (var i = 0, _len = this.replacementTable.length; i < _len; i++) {
-			var replacementEntry = this.replacementTable[i];
-			
-			if (word.indexOf(replacementEntry[0]) !== -1) {
-				var correctedWord = word.replace(replacementEntry[0], replacementEntry[1]);
-				
-				if (this.check(correctedWord)) {
-					return [ correctedWord ];
-				}
-			}
-		}
-		
-		var self = this;
-		self.alphabet = "abcdefghijklmnopqrstuvwxyz";
-		
-		/*
-		if (!self.alphabet) {
-			// Use the alphabet as implicitly defined by the words in the dictionary.
-			var alphaHash = {};
-			
-			for (var i in self.dictionaryTable) {
-				for (var j = 0, _len = i.length; j < _len; j++) {
-					alphaHash[i[j]] = true;
-				}
-			}
-			
-			for (var i in alphaHash) {
-				self.alphabet += i;
-			}
-			
-			var alphaArray = self.alphabet.split("");
-			alphaArray.sort();
-			self.alphabet = alphaArray.join("");
-		}
-		*/
-		
-		function edits1(words) {
-			var rv = [];
-			
-			for (var ii = 0, _iilen = words.length; ii < _iilen; ii++) {
-				var word = words[ii];
-				
-				var splits = [];
-			
-				for (var i = 0, _len = word.length + 1; i < _len; i++) {
-					splits.push([ word.substring(0, i), word.substring(i, word.length) ]);
-				}
-			
-				var deletes = [];
-			
-				for (var i = 0, _len = splits.length; i < _len; i++) {
-					var s = splits[i];
-				
-					if (s[1]) {
-						deletes.push(s[0] + s[1].substring(1));
-					}
-				}
-			
-				var transposes = [];
-			
-				for (var i = 0, _len = splits.length; i < _len; i++) {
-					var s = splits[i];
-				
-					if (s[1].length > 1) {
-						transposes.push(s[0] + s[1][1] + s[1][0] + s[1].substring(2));
-					}
-				}
-			
-				var replaces = [];
-			
-				for (var i = 0, _len = splits.length; i < _len; i++) {
-					var s = splits[i];
-				
-					if (s[1]) {
-						for (var j = 0, _jlen = self.alphabet.length; j < _jlen; j++) {
-							replaces.push(s[0] + self.alphabet[j] + s[1].substring(1));
-						}
-					}
-				}
-			
-				var inserts = [];
-			
-				for (var i = 0, _len = splits.length; i < _len; i++) {
-					var s = splits[i];
-				
-					if (s[1]) {
-						for (var j = 0, _jlen = self.alphabet.length; j < _jlen; j++) {
-							replaces.push(s[0] + self.alphabet[j] + s[1]);
-						}
-					}
-				}
-			
-				rv = rv.concat(deletes);
-				rv = rv.concat(transposes);
-				rv = rv.concat(replaces);
-				rv = rv.concat(inserts);
-			}
-			
-			return rv;
-		}
-		
-		function known(words) {
-			var rv = [];
-			
-			for (var i = 0; i < words.length; i++) {
-				if (self.check(words[i])) {
-					rv.push(words[i]);
-				}
-			}
-			
-			return rv;
-		}
-		
-		function correct(word) {
-			// Get the edit-distance-1 and edit-distance-2 forms of this word.
-			var ed1 = edits1([word]);
-			var ed2 = edits1(ed1);
-			
-			var corrections = known(ed1).concat(known(ed2));
-			
-			// Sort the edits based on how many different ways they were created.
-			var weighted_corrections = {};
-			
-			for (var i = 0, _len = corrections.length; i < _len; i++) {
-				if (!(corrections[i] in weighted_corrections)) {
-					weighted_corrections[corrections[i]] = 1;
-				}
-				else {
-					weighted_corrections[corrections[i]] += 1;
-				}
-			}
-			
-			var sorted_corrections = [];
-			
-			for (var i in weighted_corrections) {
-				sorted_corrections.push([ i, weighted_corrections[i] ]);
-			}
-			
-			function sorter(a, b) {
-				if (a[1] < b[1]) {
-					return -1;
-				}
-				
-				return 1;
-			}
-			
-			sorted_corrections.sort(sorter).reverse();
-			
-			var rv = [];
-			
-			for (var i = 0, _len = Math.min(limit, sorted_corrections.length); i < _len; i++) {
-				if (!self.hasFlag(sorted_corrections[i][0], "NOSUGGEST")) {
-					rv.push(sorted_corrections[i][0]);
-				}
-			}
-			
-			return rv;
-		}
-		
-		return correct(word);
-	}
-};
-; browserify_shim__define__module__export__(typeof Typo != "undefined" ? Typo : window.Typo);
-
-}).call(global, undefined, undefined, undefined, undefined, function defineExport(ex) { module.exports = ex; });
-
-}).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{}],3:[function(require,module,exports){
 // CodeMirror, copyright (c) by Marijn Haverbeke and others
 // Distributed under an MIT license: http://codemirror.net/LICENSE
 
@@ -922,7 +47,7 @@ Typo.prototype = {
   }
 });
 
-},{"../../lib/codemirror":7}],4:[function(require,module,exports){
+},{"../../lib/codemirror":5}],2:[function(require,module,exports){
 // CodeMirror, copyright (c) by Marijn Haverbeke and others
 // Distributed under an MIT license: http://codemirror.net/LICENSE
 
@@ -939,10 +64,12 @@ Typo.prototype = {
     if (val && !prev) {
       cm.on("blur", onBlur);
       cm.on("change", onChange);
+      cm.on("swapDoc", onChange);
       onChange(cm);
     } else if (!val && prev) {
       cm.off("blur", onBlur);
       cm.off("change", onChange);
+      cm.off("swapDoc", onChange);
       clearPlaceholder(cm);
       var wrapper = cm.getWrapperElement();
       wrapper.className = wrapper.className.replace(" CodeMirror-empty", "");
@@ -984,7 +111,7 @@ Typo.prototype = {
   }
 });
 
-},{"../../lib/codemirror":7}],5:[function(require,module,exports){
+},{"../../lib/codemirror":5}],3:[function(require,module,exports){
 // CodeMirror, copyright (c) by Marijn Haverbeke and others
 // Distributed under an MIT license: http://codemirror.net/LICENSE
 
@@ -1037,7 +164,7 @@ Typo.prototype = {
   };
 });
 
-},{"../../lib/codemirror":7}],6:[function(require,module,exports){
+},{"../../lib/codemirror":5}],4:[function(require,module,exports){
 // CodeMirror, copyright (c) by Marijn Haverbeke and others
 // Distributed under an MIT license: http://codemirror.net/LICENSE
 
@@ -1124,7 +251,7 @@ CodeMirror.overlayMode = function(base, overlay, combine) {
 
 });
 
-},{"../../lib/codemirror":7}],7:[function(require,module,exports){
+},{"../../lib/codemirror":5}],5:[function(require,module,exports){
 // CodeMirror, copyright (c) by Marijn Haverbeke and others
 // Distributed under an MIT license: http://codemirror.net/LICENSE
 
@@ -1140,7 +267,7 @@ CodeMirror.overlayMode = function(base, overlay, combine) {
   else if (typeof define == "function" && define.amd) // AMD
     return define([], mod);
   else // Plain browser env
-    this.CodeMirror = mod();
+    (this || window).CodeMirror = mod();
 })(function() {
   "use strict";
 
@@ -1670,6 +797,7 @@ CodeMirror.overlayMode = function(base, overlay, combine) {
 
     d.sizer.style.paddingRight = (d.barWidth = sizes.right) + "px";
     d.sizer.style.paddingBottom = (d.barHeight = sizes.bottom) + "px";
+    d.heightForcer.style.borderBottom = sizes.bottom + "px solid transparent"
 
     if (sizes.right && sizes.bottom) {
       d.scrollbarFiller.style.display = "block";
@@ -1914,9 +1042,9 @@ CodeMirror.overlayMode = function(base, overlay, combine) {
 
   function setDocumentHeight(cm, measure) {
     cm.display.sizer.style.minHeight = measure.docHeight + "px";
-    var total = measure.docHeight + cm.display.barHeight;
-    cm.display.heightForcer.style.top = total + "px";
-    cm.display.gutters.style.height = Math.max(total + scrollGap(cm), measure.clientHeight) + "px";
+    cm.display.heightForcer.style.top = measure.docHeight + "px";
+    cm.display.gutters.style.height = Math.max(measure.docHeight + cm.display.barHeight + scrollGap(cm),
+                                               measure.clientHeight) + "px";
   }
 
   // Read the actual heights of the rendered lines, and update their
@@ -2221,10 +1349,6 @@ CodeMirror.overlayMode = function(base, overlay, combine) {
     if (!cm.state.focused) { cm.display.input.focus(); onFocus(cm); }
   }
 
-  function isReadOnly(cm) {
-    return cm.options.readOnly || cm.doc.cantEdit;
-  }
-
   // This will be set to an array of strings when copying, so that,
   // when pasting, we know what kind of selections the copied text
   // was made out of.
@@ -2279,7 +1403,7 @@ CodeMirror.overlayMode = function(base, overlay, combine) {
     var pasted = e.clipboardData && e.clipboardData.getData("text/plain");
     if (pasted) {
       e.preventDefault();
-      if (!isReadOnly(cm) && !cm.options.disableInput)
+      if (!cm.isReadOnly() && !cm.options.disableInput)
         runInOp(cm, function() { applyTextInput(cm, pasted, 0, null, "paste"); });
       return true;
     }
@@ -2382,13 +1506,14 @@ CodeMirror.overlayMode = function(base, overlay, combine) {
       });
 
       on(te, "paste", function(e) {
-        if (handlePaste(e, cm)) return true;
+        if (signalDOMEvent(cm, e) || handlePaste(e, cm)) return
 
         cm.state.pasteIncoming = true;
         input.fastPoll();
       });
 
       function prepareCopyCut(e) {
+        if (signalDOMEvent(cm, e)) return
         if (cm.somethingSelected()) {
           lastCopied = cm.getSelections();
           if (input.inaccurateSelection) {
@@ -2416,7 +1541,7 @@ CodeMirror.overlayMode = function(base, overlay, combine) {
       on(te, "copy", prepareCopyCut);
 
       on(display.scroller, "paste", function(e) {
-        if (eventInWidget(display, e)) return;
+        if (eventInWidget(display, e) || signalDOMEvent(cm, e)) return;
         cm.state.pasteIncoming = true;
         input.focus();
       });
@@ -2550,7 +1675,7 @@ CodeMirror.overlayMode = function(base, overlay, combine) {
       // in which case reading its value would be expensive.
       if (this.contextMenuPending || !cm.state.focused ||
           (hasSelection(input) && !prevInput && !this.composing) ||
-          isReadOnly(cm) || cm.options.disableInput || cm.state.keySeq)
+          cm.isReadOnly() || cm.options.disableInput || cm.state.keySeq)
         return false;
 
       var text = input.value;
@@ -2612,10 +1737,11 @@ CodeMirror.overlayMode = function(base, overlay, combine) {
       if (reset && cm.doc.sel.contains(pos) == -1)
         operation(cm, setSelection)(cm.doc, simpleSelection(pos), sel_dontScroll);
 
-      var oldCSS = te.style.cssText;
-      input.wrapper.style.position = "absolute";
-      te.style.cssText = "position: fixed; width: 30px; height: 30px; top: " + (e.clientY - 5) +
-        "px; left: " + (e.clientX - 5) + "px; z-index: 1000; background: " +
+      var oldCSS = te.style.cssText, oldWrapperCSS = input.wrapper.style.cssText;
+      input.wrapper.style.cssText = "position: absolute"
+      var wrapperBox = input.wrapper.getBoundingClientRect()
+      te.style.cssText = "position: absolute; width: 30px; height: 30px; top: " + (e.clientY - wrapperBox.top - 5) +
+        "px; left: " + (e.clientX - wrapperBox.left - 5) + "px; z-index: 1000; background: " +
         (ie ? "rgba(255, 255, 255, .05)" : "transparent") +
         "; outline: none; border-width: 0; outline: none; overflow: hidden; opacity: .05; filter: alpha(opacity=5);";
       if (webkit) var oldScrollY = window.scrollY; // Work around Chrome issue (#2712)
@@ -2646,7 +1772,7 @@ CodeMirror.overlayMode = function(base, overlay, combine) {
       }
       function rehide() {
         input.contextMenuPending = false;
-        input.wrapper.style.position = "relative";
+        input.wrapper.style.cssText = oldWrapperCSS
         te.style.cssText = oldCSS;
         if (ie && ie_version < 9) display.scrollbars.setScrollTop(display.scroller.scrollTop = scrollPos);
 
@@ -2701,7 +1827,9 @@ CodeMirror.overlayMode = function(base, overlay, combine) {
       var div = input.div = display.lineDiv;
       disableBrowserMagic(div);
 
-      on(div, "paste", function(e) { handlePaste(e, cm); })
+      on(div, "paste", function(e) {
+        if (!signalDOMEvent(cm, e)) handlePaste(e, cm);
+      })
 
       on(div, "compositionstart", function(e) {
         var data = e.data;
@@ -2739,11 +1867,12 @@ CodeMirror.overlayMode = function(base, overlay, combine) {
 
       on(div, "input", function() {
         if (input.composing) return;
-        if (isReadOnly(cm) || !input.pollContent())
+        if (cm.isReadOnly() || !input.pollContent())
           runInOp(input.cm, function() {regChange(cm);});
       });
 
       function onCopyCut(e) {
+        if (signalDOMEvent(cm, e)) return
         if (cm.somethingSelected()) {
           lastCopied = cm.getSelections();
           if (e.type == "cut") cm.replaceSelection("", null, "cut");
@@ -2819,8 +1948,13 @@ CodeMirror.overlayMode = function(base, overlay, combine) {
       try { var rng = range(start.node, start.offset, end.offset, end.node); }
       catch(e) {} // Our model of the DOM might be outdated, in which case the range we try to set can be impossible
       if (rng) {
-        sel.removeAllRanges();
-        sel.addRange(rng);
+        if (!gecko && this.cm.state.focused) {
+          sel.collapse(start.node, start.offset);
+          if (!rng.collapsed) sel.addRange(rng);
+        } else {
+          sel.removeAllRanges();
+          sel.addRange(rng);
+        }
         if (old && sel.anchorNode == null) sel.addRange(old);
         else if (gecko) this.startGracePeriod();
       }
@@ -2964,7 +2098,7 @@ CodeMirror.overlayMode = function(base, overlay, combine) {
       this.div.focus();
     },
     applyComposition: function(composing) {
-      if (isReadOnly(this.cm))
+      if (this.cm.isReadOnly())
         operation(this.cm, regChange)(this.cm)
       else if (composing.data && composing.data != composing.startData)
         operation(this.cm, applyTextInput)(this.cm, composing.data, 0, composing.sel);
@@ -2976,7 +2110,7 @@ CodeMirror.overlayMode = function(base, overlay, combine) {
 
     onKeyPress: function(e) {
       e.preventDefault();
-      if (!isReadOnly(this.cm))
+      if (!this.cm.isReadOnly())
         operation(this.cm, applyTextInput)(this.cm, String.fromCharCode(e.charCode == null ? e.keyCode : e.charCode), 0);
     },
 
@@ -3281,7 +2415,7 @@ CodeMirror.overlayMode = function(base, overlay, combine) {
 
   // Give beforeSelectionChange handlers a change to influence a
   // selection update.
-  function filterSelectionChange(doc, sel) {
+  function filterSelectionChange(doc, sel, options) {
     var obj = {
       ranges: sel.ranges,
       update: function(ranges) {
@@ -3289,7 +2423,8 @@ CodeMirror.overlayMode = function(base, overlay, combine) {
         for (var i = 0; i < ranges.length; i++)
           this.ranges[i] = new Range(clipPos(doc, ranges[i].anchor),
                                      clipPos(doc, ranges[i].head));
-      }
+      },
+      origin: options && options.origin
     };
     signal(doc, "beforeSelectionChange", doc, obj);
     if (doc.cm) signal(doc.cm, "beforeSelectionChange", doc.cm, obj);
@@ -3315,7 +2450,7 @@ CodeMirror.overlayMode = function(base, overlay, combine) {
 
   function setSelectionNoUndo(doc, sel, options) {
     if (hasHandler(doc, "beforeSelectionChange") || doc.cm && hasHandler(doc.cm, "beforeSelectionChange"))
-      sel = filterSelectionChange(doc, sel);
+      sel = filterSelectionChange(doc, sel, options);
 
     var bias = options && options.bias ||
       (cmp(sel.primary().head, doc.sel.primary().head) < 0 ? -1 : 1);
@@ -3377,13 +2512,15 @@ CodeMirror.overlayMode = function(base, overlay, combine) {
 
         if (oldPos) {
           var near = m.find(dir < 0 ? 1 : -1), diff;
-          if (dir < 0 ? m.inclusiveRight : m.inclusiveLeft) near = movePos(doc, near, -dir, line);
+          if (dir < 0 ? m.inclusiveRight : m.inclusiveLeft)
+            near = movePos(doc, near, -dir, near && near.line == pos.line ? line : null);
           if (near && near.line == pos.line && (diff = cmp(near, oldPos)) && (dir < 0 ? diff < 0 : diff > 0))
             return skipAtomicInner(doc, near, pos, dir, mayClear);
         }
 
         var far = m.find(dir < 0 ? -1 : 1);
-        if (dir < 0 ? m.inclusiveLeft : m.inclusiveRight) far = movePos(doc, far, dir, line);
+        if (dir < 0 ? m.inclusiveLeft : m.inclusiveRight)
+          far = movePos(doc, far, dir, far.line == pos.line ? line : null);
         return far ? skipAtomicInner(doc, far, pos, dir, mayClear) : null;
       }
     }
@@ -3430,6 +2567,7 @@ CodeMirror.overlayMode = function(base, overlay, combine) {
     for (var i = 0; i < doc.sel.ranges.length; i++) {
       if (primary === false && i == doc.sel.primIndex) continue;
       var range = doc.sel.ranges[i];
+      if (range.from().line >= cm.display.viewTo || range.to().line < cm.display.viewFrom) continue;
       var collapsed = range.empty();
       if (collapsed || cm.options.showCursorWhenSelecting)
         drawSelectionCursor(cm, range.head, curFragment);
@@ -4260,7 +3398,7 @@ CodeMirror.overlayMode = function(base, overlay, combine) {
       display.scroller.scrollTop = doc.scrollTop;
     }
     if (op.scrollLeft != null && (display.scroller.scrollLeft != op.scrollLeft || op.forceScroll)) {
-      doc.scrollLeft = Math.max(0, Math.min(display.scroller.scrollWidth - displayWidth(cm), op.scrollLeft));
+      doc.scrollLeft = Math.max(0, Math.min(display.scroller.scrollWidth - display.scroller.clientWidth, op.scrollLeft));
       display.scrollbars.setScrollLeft(doc.scrollLeft);
       display.scroller.scrollLeft = doc.scrollLeft;
       alignHorizontally(cm);
@@ -4556,7 +3694,7 @@ CodeMirror.overlayMode = function(base, overlay, combine) {
       return dx * dx + dy * dy > 20 * 20;
     }
     on(d.scroller, "touchstart", function(e) {
-      if (!isMouseLikeTouchEvent(e)) {
+      if (!signalDOMEvent(cm, e) && !isMouseLikeTouchEvent(e)) {
         clearTimeout(touchFinished);
         var now = +new Date;
         d.activeTouch = {start: now, moved: false,
@@ -4685,7 +3823,7 @@ CodeMirror.overlayMode = function(base, overlay, combine) {
   // not interfere with, such as a scrollbar or widget.
   function onMouseDown(e) {
     var cm = this, display = cm.display;
-    if (display.activeTouch && display.input.supportsTouch() || signalDOMEvent(cm, e)) return;
+    if (signalDOMEvent(cm, e) || display.activeTouch && display.input.supportsTouch()) return;
     display.shift = e.shiftKey;
 
     if (eventInWidget(display, e)) {
@@ -4741,7 +3879,7 @@ CodeMirror.overlayMode = function(base, overlay, combine) {
     }
 
     var sel = cm.doc.sel, modifier = mac ? e.metaKey : e.ctrlKey, contained;
-    if (cm.options.dragDrop && dragAndDrop && !isReadOnly(cm) &&
+    if (cm.options.dragDrop && dragAndDrop && !cm.isReadOnly() &&
         type == "single" && (contained = sel.contains(start)) > -1 &&
         (cmp((contained = sel.ranges[contained]).from(), start) < 0 || start.xRel > 0) &&
         (cmp(contained.to(), start) > 0 || start.xRel < 0))
@@ -4965,7 +4103,7 @@ CodeMirror.overlayMode = function(base, overlay, combine) {
     e_preventDefault(e);
     if (ie) lastDrop = +new Date;
     var pos = posFromMouse(cm, e, true), files = e.dataTransfer.files;
-    if (!pos || isReadOnly(cm)) return;
+    if (!pos || cm.isReadOnly()) return;
     // Might be a file drop, in which case we simply extract the text
     // and insert it.
     if (files && files.length && window.FileReader && window.File) {
@@ -5204,7 +4342,7 @@ CodeMirror.overlayMode = function(base, overlay, combine) {
     cm.display.input.ensurePolled();
     var prevShift = cm.display.shift, done = false;
     try {
-      if (isReadOnly(cm)) cm.state.suppressEdits = true;
+      if (cm.isReadOnly()) cm.state.suppressEdits = true;
       if (dropShift) cm.display.shift = false;
       done = bound(cm) != Pass;
     } finally {
@@ -5937,10 +5075,9 @@ CodeMirror.overlayMode = function(base, overlay, combine) {
   function findPosH(doc, pos, dir, unit, visually) {
     var line = pos.line, ch = pos.ch, origDir = dir;
     var lineObj = getLine(doc, line);
-    var possible = true;
     function findNextLine() {
       var l = line + dir;
-      if (l < doc.first || l >= doc.first + doc.size) return (possible = false);
+      if (l < doc.first || l >= doc.first + doc.size) return false
       line = l;
       return lineObj = getLine(doc, l);
     }
@@ -5950,14 +5087,16 @@ CodeMirror.overlayMode = function(base, overlay, combine) {
         if (!boundToLine && findNextLine()) {
           if (visually) ch = (dir < 0 ? lineRight : lineLeft)(lineObj);
           else ch = dir < 0 ? lineObj.text.length : 0;
-        } else return (possible = false);
+        } else return false
       } else ch = next;
       return true;
     }
 
-    if (unit == "char") moveOnce();
-    else if (unit == "column") moveOnce(true);
-    else if (unit == "word" || unit == "group") {
+    if (unit == "char") {
+      moveOnce()
+    } else if (unit == "column") {
+      moveOnce(true)
+    } else if (unit == "word" || unit == "group") {
       var sawType = null, group = unit == "group";
       var helper = doc.cm && doc.cm.getHelper(pos, "wordChars");
       for (var first = true;; first = false) {
@@ -5978,7 +5117,7 @@ CodeMirror.overlayMode = function(base, overlay, combine) {
       }
     }
     var result = skipAtomic(doc, Pos(line, ch), pos, origDir, true);
-    if (!possible) result.hitSide = true;
+    if (!cmp(pos, result)) result.hitSide = true;
     return result;
   }
 
@@ -6365,6 +5504,7 @@ CodeMirror.overlayMode = function(base, overlay, combine) {
       signal(this, "overwriteToggle", this, this.state.overwrite);
     },
     hasFocus: function() { return this.display.input.getField() == activeElt(); },
+    isReadOnly: function() { return !!(this.options.readOnly || this.doc.cantEdit); },
 
     scrollTo: methodOp(function(x, y) {
       if (x != null || y != null) resolveScrollToPos(this);
@@ -8211,7 +7351,7 @@ CodeMirror.overlayMode = function(base, overlay, combine) {
       if (nextChange == pos) { // Update current marker set
         spanStyle = spanEndStyle = spanStartStyle = title = css = "";
         collapsed = null; nextChange = Infinity;
-        var foundBookmarks = [];
+        var foundBookmarks = [], endStyles
         for (var j = 0; j < spans.length; ++j) {
           var sp = spans[j], m = sp.marker;
           if (m.type == "bookmark" && sp.from == pos && m.widgetNode) {
@@ -8224,7 +7364,7 @@ CodeMirror.overlayMode = function(base, overlay, combine) {
             if (m.className) spanStyle += " " + m.className;
             if (m.css) css = (css ? css + ";" : "") + m.css;
             if (m.startStyle && sp.from == pos) spanStartStyle += " " + m.startStyle;
-            if (m.endStyle && sp.to == nextChange) spanEndStyle += " " + m.endStyle;
+            if (m.endStyle && sp.to == nextChange) (endStyles || (endStyles = [])).push(m.endStyle, sp.to)
             if (m.title && !title) title = m.title;
             if (m.collapsed && (!collapsed || compareCollapsedMarkers(collapsed.marker, m) < 0))
               collapsed = sp;
@@ -8232,14 +7372,17 @@ CodeMirror.overlayMode = function(base, overlay, combine) {
             nextChange = sp.from;
           }
         }
+        if (endStyles) for (var j = 0; j < endStyles.length; j += 2)
+          if (endStyles[j + 1] == nextChange) spanEndStyle += " " + endStyles[j]
+
+        if (!collapsed || collapsed.from == pos) for (var j = 0; j < foundBookmarks.length; ++j)
+          buildCollapsedSpan(builder, 0, foundBookmarks[j]);
         if (collapsed && (collapsed.from || 0) == pos) {
           buildCollapsedSpan(builder, (collapsed.to == null ? len + 1 : collapsed.to) - pos,
                              collapsed.marker, collapsed.from == null);
           if (collapsed.to == null) return;
           if (collapsed.to == pos) collapsed = false;
         }
-        if (!collapsed && foundBookmarks.length) for (var j = 0; j < foundBookmarks.length; ++j)
-          buildCollapsedSpan(builder, 0, foundBookmarks[j]);
       }
       if (pos >= len) break;
 
@@ -8579,10 +7722,11 @@ CodeMirror.overlayMode = function(base, overlay, combine) {
       extendSelection(this, clipPos(this, head), other && clipPos(this, other), options);
     }),
     extendSelections: docMethodOp(function(heads, options) {
-      extendSelections(this, clipPosArray(this, heads, options));
+      extendSelections(this, clipPosArray(this, heads), options);
     }),
     extendSelectionsBy: docMethodOp(function(f, options) {
-      extendSelections(this, map(this.sel.ranges, f), options);
+      var heads = map(this.sel.ranges, f);
+      extendSelections(this, clipPosArray(this, heads), options);
     }),
     setSelections: docMethodOp(function(ranges, primary, options) {
       if (!ranges.length) return;
@@ -8735,9 +7879,9 @@ CodeMirror.overlayMode = function(base, overlay, combine) {
         var spans = line.markedSpans;
         if (spans) for (var i = 0; i < spans.length; i++) {
           var span = spans[i];
-          if (!(lineNo == from.line && from.ch > span.to ||
-                span.from == null && lineNo != from.line||
-                lineNo == to.line && span.from > to.ch) &&
+          if (!(span.to != null && lineNo == from.line && from.ch > span.to ||
+                span.from == null && lineNo != from.line ||
+                span.from != null && lineNo == to.line && span.from > to.ch) &&
               (!filter || filter(span.marker)))
             found.push(span.marker.parent || span.marker);
         }
@@ -9999,12 +9143,12 @@ CodeMirror.overlayMode = function(base, overlay, combine) {
 
   // THE END
 
-  CodeMirror.version = "5.9.1";
+  CodeMirror.version = "5.12.1";
 
   return CodeMirror;
 });
 
-},{}],8:[function(require,module,exports){
+},{}],6:[function(require,module,exports){
 // CodeMirror, copyright (c) by Marijn Haverbeke and others
 // Distributed under an MIT license: http://codemirror.net/LICENSE
 
@@ -10136,7 +9280,7 @@ CodeMirror.defineMode("gfm", function(config, modeConfig) {
   CodeMirror.defineMIME("text/x-gfm", "gfm");
 });
 
-},{"../../addon/mode/overlay":6,"../../lib/codemirror":7,"../markdown/markdown":9}],9:[function(require,module,exports){
+},{"../../addon/mode/overlay":4,"../../lib/codemirror":5,"../markdown/markdown":7}],7:[function(require,module,exports){
 // CodeMirror, copyright (c) by Marijn Haverbeke and others
 // Distributed under an MIT license: http://codemirror.net/LICENSE
 
@@ -10152,8 +9296,8 @@ CodeMirror.defineMode("gfm", function(config, modeConfig) {
 
 CodeMirror.defineMode("markdown", function(cmCfg, modeCfg) {
 
-  var htmlFound = CodeMirror.modes.hasOwnProperty("xml");
-  var htmlMode = CodeMirror.getMode(cmCfg, htmlFound ? {name: "xml", htmlMode: true} : "text/plain");
+  var htmlMode = CodeMirror.getMode(cmCfg, "text/html");
+  var htmlModeMissing = htmlMode.name == "null"
 
   function getMode(name) {
     if (CodeMirror.findModeByName) {
@@ -10193,8 +9337,6 @@ CodeMirror.defineMode("markdown", function(cmCfg, modeCfg) {
   // Allow token types to be overridden by user-provided token types.
   if (modeCfg.tokenTypeOverrides === undefined)
     modeCfg.tokenTypeOverrides = {};
-
-  var codeDepth = 0;
 
   var tokenTypes = {
     header: "header",
@@ -10260,7 +9402,7 @@ CodeMirror.defineMode("markdown", function(cmCfg, modeCfg) {
     state.quote = 0;
     // Reset state.indentedCode
     state.indentedCode = false;
-    if (!htmlFound && state.f == htmlBlock) {
+    if (htmlModeMissing && state.f == htmlBlock) {
       state.f = inlineNormal;
       state.block = blockNormal;
     }
@@ -10290,10 +9432,8 @@ CodeMirror.defineMode("markdown", function(cmCfg, modeCfg) {
         state.list = null;
       } else if (state.indentation > 0) {
         state.list = null;
-        state.listDepth = Math.floor(state.indentation / 4);
       } else { // No longer a list
         state.list = false;
-        state.listDepth = 0;
       }
     }
 
@@ -10340,7 +9480,17 @@ CodeMirror.defineMode("markdown", function(cmCfg, modeCfg) {
       }
       state.indentation = stream.column() + stream.current().length;
       state.list = true;
-      state.listDepth++;
+
+      // While this list item's marker's indentation
+      // is less than the deepest list item's content's indentation,
+      // pop the deepest list item indentation off the stack.
+      while (state.listStack && stream.column() < state.listStack[state.listStack.length - 1]) {
+        state.listStack.pop();
+      }
+
+      // Add this list item's content's indentation to the stack
+      state.listStack.push(state.indentation);
+
       if (modeCfg.taskLists && stream.match(taskListRE, false)) {
         state.taskList = true;
       }
@@ -10354,7 +9504,7 @@ CodeMirror.defineMode("markdown", function(cmCfg, modeCfg) {
       if (state.localMode) state.localState = state.localMode.startState();
       state.f = state.block = local;
       if (modeCfg.highlightFormatting) state.formatting = "code-block";
-      state.code = true;
+      state.code = -1
       return getType(state);
     }
 
@@ -10363,18 +9513,21 @@ CodeMirror.defineMode("markdown", function(cmCfg, modeCfg) {
 
   function htmlBlock(stream, state) {
     var style = htmlMode.token(stream, state.htmlState);
-    if ((htmlFound && state.htmlState.tagStart === null &&
-         (!state.htmlState.context && state.htmlState.tokenize.isInText)) ||
-        (state.md_inside && stream.current().indexOf(">") > -1)) {
-      state.f = inlineNormal;
-      state.block = blockNormal;
-      state.htmlState = null;
+    if (!htmlModeMissing) {
+      var inner = CodeMirror.innerMode(htmlMode, state.htmlState)
+      if ((inner.mode.name == "xml" && inner.state.tagStart === null &&
+           (!inner.state.context && inner.state.tokenize.isInText)) ||
+          (state.md_inside && stream.current().indexOf(">") > -1)) {
+        state.f = inlineNormal;
+        state.block = blockNormal;
+        state.htmlState = null;
+      }
     }
     return style;
   }
 
   function local(stream, state) {
-    if (stream.sol() && state.fencedChars && stream.match(state.fencedChars, false)) {
+    if (state.fencedChars && stream.match(state.fencedChars, false)) {
       state.localMode = state.localState = null;
       state.f = state.block = leavingLocal;
       return null;
@@ -10392,9 +9545,9 @@ CodeMirror.defineMode("markdown", function(cmCfg, modeCfg) {
     state.f = inlineNormal;
     state.fencedChars = null;
     if (modeCfg.highlightFormatting) state.formatting = "code-block";
-    state.code = true;
+    state.code = 1
     var returnType = getType(state);
-    state.code = false;
+    state.code = 0
     return returnType;
   }
 
@@ -10459,7 +9612,7 @@ CodeMirror.defineMode("markdown", function(cmCfg, modeCfg) {
     }
 
     if (state.list !== false) {
-      var listMod = (state.listDepth - 1) % 3;
+      var listMod = (state.listStack.length - 1) % 3;
       if (!listMod) {
         styles.push(tokenTypes.list1);
       } else if (listMod === 1) {
@@ -10517,15 +9670,6 @@ CodeMirror.defineMode("markdown", function(cmCfg, modeCfg) {
 
     var ch = stream.next();
 
-    if (ch === '\\') {
-      stream.next();
-      if (modeCfg.highlightFormatting) {
-        var type = getType(state);
-        var formattingEscape = tokenTypes.formatting + "-escape";
-        return type ? type + " " + formattingEscape : formattingEscape;
-      }
-    }
-
     // Matches link titles present on next line
     if (state.linkTitle) {
       state.linkTitle = false;
@@ -10544,24 +9688,30 @@ CodeMirror.defineMode("markdown", function(cmCfg, modeCfg) {
     if (ch === '`') {
       var previousFormatting = state.formatting;
       if (modeCfg.highlightFormatting) state.formatting = "code";
-      var t = getType(state);
-      var before = stream.pos;
       stream.eatWhile('`');
-      var difference = 1 + stream.pos - before;
-      if (!state.code) {
-        codeDepth = difference;
-        state.code = true;
-        return getType(state);
+      var count = stream.current().length
+      if (state.code == 0) {
+        state.code = count
+        return getType(state)
+      } else if (count == state.code) { // Must be exact
+        var t = getType(state)
+        state.code = 0
+        return t
       } else {
-        if (difference === codeDepth) { // Must be exact
-          state.code = false;
-          return t;
-        }
-        state.formatting = previousFormatting;
-        return getType(state);
+        state.formatting = previousFormatting
+        return getType(state)
       }
     } else if (state.code) {
       return getType(state);
+    }
+
+    if (ch === '\\') {
+      stream.next();
+      if (modeCfg.highlightFormatting) {
+        var type = getType(state);
+        var formattingEscape = tokenTypes.formatting + "-escape";
+        return type ? type + " " + formattingEscape : formattingEscape;
+      }
     }
 
     if (ch === '!' && stream.match(/\[[^\]]*\] ?(?:\(|\[)/, false)) {
@@ -10759,7 +9909,7 @@ CodeMirror.defineMode("markdown", function(cmCfg, modeCfg) {
   }
 
   function footnoteLink(stream, state) {
-    if (stream.match(/^[^\]]*\]:/, false)) {
+    if (stream.match(/^([^\]\\]|\\.)*\]:/, false)) {
       state.f = footnoteLinkInside;
       stream.next(); // Consume [
       if (modeCfg.highlightFormatting) state.formatting = "link";
@@ -10778,7 +9928,7 @@ CodeMirror.defineMode("markdown", function(cmCfg, modeCfg) {
       return returnType;
     }
 
-    stream.match(/^[^\]]+/, true);
+    stream.match(/^([^\]\\]|\\.)+/, true);
 
     return tokenTypes.linkText;
   }
@@ -10831,13 +9981,14 @@ CodeMirror.defineMode("markdown", function(cmCfg, modeCfg) {
         linkText: false,
         linkHref: false,
         linkTitle: false,
+        code: 0,
         em: false,
         strong: false,
         header: 0,
         hr: false,
         taskList: false,
         list: false,
-        listDepth: 0,
+        listStack: [],
         quote: 0,
         trailingSpace: 0,
         trailingSpaceNewLine: false,
@@ -10872,7 +10023,7 @@ CodeMirror.defineMode("markdown", function(cmCfg, modeCfg) {
         hr: s.hr,
         taskList: s.taskList,
         list: s.list,
-        listDepth: s.listDepth,
+        listStack: s.listStack.slice(0),
         quote: s.quote,
         indentedCode: s.indentedCode,
         trailingSpace: s.trailingSpace,
@@ -10912,11 +10063,8 @@ CodeMirror.defineMode("markdown", function(cmCfg, modeCfg) {
 
         state.f = state.block;
         var indentation = stream.match(/^\s*/, true)[0].replace(/\t/g, '    ').length;
-        var difference = Math.floor((indentation - state.indentation) / 4) * 4;
-        if (difference > 4) difference = 4;
-        var adjustedIndentation = state.indentation + difference;
-        state.indentationDiff = adjustedIndentation - state.indentation;
-        state.indentation = adjustedIndentation;
+        state.indentationDiff = Math.min(indentation - state.indentation, 4);
+        state.indentation = state.indentation + state.indentationDiff;
         if (indentation > 0) return null;
       }
       return state.f(stream, state);
@@ -10941,7 +10089,7 @@ CodeMirror.defineMIME("text/x-markdown", "markdown");
 
 });
 
-},{"../../lib/codemirror":7,"../meta":10,"../xml/xml":11}],10:[function(require,module,exports){
+},{"../../lib/codemirror":5,"../meta":8,"../xml/xml":9}],8:[function(require,module,exports){
 // CodeMirror, copyright (c) by Marijn Haverbeke and others
 // Distributed under an MIT license: http://codemirror.net/LICENSE
 
@@ -10965,13 +10113,15 @@ CodeMirror.defineMIME("text/x-markdown", "markdown");
     {name: "C++", mime: "text/x-c++src", mode: "clike", ext: ["cpp", "c++", "cc", "cxx", "hpp", "h++", "hh", "hxx"], alias: ["cpp"]},
     {name: "Cobol", mime: "text/x-cobol", mode: "cobol", ext: ["cob", "cpy"]},
     {name: "C#", mime: "text/x-csharp", mode: "clike", ext: ["cs"], alias: ["csharp"]},
-    {name: "Clojure", mime: "text/x-clojure", mode: "clojure", ext: ["clj"]},
+    {name: "Clojure", mime: "text/x-clojure", mode: "clojure", ext: ["clj", "cljc", "cljx"]},
+    {name: "ClojureScript", mime: "text/x-clojurescript", mode: "clojure", ext: ["cljs"]},
     {name: "Closure Stylesheets (GSS)", mime: "text/x-gss", mode: "css", ext: ["gss"]},
     {name: "CMake", mime: "text/x-cmake", mode: "cmake", ext: ["cmake", "cmake.in"], file: /^CMakeLists.txt$/},
     {name: "CoffeeScript", mime: "text/x-coffeescript", mode: "coffeescript", ext: ["coffee"], alias: ["coffee", "coffee-script"]},
     {name: "Common Lisp", mime: "text/x-common-lisp", mode: "commonlisp", ext: ["cl", "lisp", "el"], alias: ["lisp"]},
     {name: "Cypher", mime: "application/x-cypher-query", mode: "cypher", ext: ["cyp", "cypher"]},
     {name: "Cython", mime: "text/x-cython", mode: "python", ext: ["pyx", "pxd", "pxi"]},
+    {name: "Crystal", mime: "text/x-crystal", mode: "crystal", ext: ["cr"]},
     {name: "CSS", mime: "text/css", mode: "css", ext: ["css"]},
     {name: "CQL", mime: "text/x-cassandra", mode: "sql", ext: ["cql"]},
     {name: "D", mime: "text/x-d", mode: "d", ext: ["d"]},
@@ -10983,12 +10133,14 @@ CodeMirror.defineMIME("text/x-markdown", "markdown");
     {name: "Dylan", mime: "text/x-dylan", mode: "dylan", ext: ["dylan", "dyl", "intr"]},
     {name: "EBNF", mime: "text/x-ebnf", mode: "ebnf"},
     {name: "ECL", mime: "text/x-ecl", mode: "ecl", ext: ["ecl"]},
+    {name: "edn", mime: "application/edn", mode: "clojure", ext: ["edn"]},
     {name: "Eiffel", mime: "text/x-eiffel", mode: "eiffel", ext: ["e"]},
     {name: "Elm", mime: "text/x-elm", mode: "elm", ext: ["elm"]},
     {name: "Embedded Javascript", mime: "application/x-ejs", mode: "htmlembedded", ext: ["ejs"]},
     {name: "Embedded Ruby", mime: "application/x-erb", mode: "htmlembedded", ext: ["erb"]},
     {name: "Erlang", mime: "text/x-erlang", mode: "erlang", ext: ["erl"]},
     {name: "Factor", mime: "text/x-factor", mode: "factor", ext: ["factor"]},
+    {name: "FCL", mime: "text/x-fcl", mode: "fcl"},
     {name: "Forth", mime: "text/x-forth", mode: "forth", ext: ["forth", "fth", "4th"]},
     {name: "Fortran", mime: "text/x-fortran", mode: "fortran", ext: ["f", "for", "f77", "f90"]},
     {name: "F#", mime: "text/x-fsharp", mode: "mllike", ext: ["fs"], alias: ["fsharp"]},
@@ -10996,9 +10148,10 @@ CodeMirror.defineMIME("text/x-markdown", "markdown");
     {name: "Gherkin", mime: "text/x-feature", mode: "gherkin", ext: ["feature"]},
     {name: "GitHub Flavored Markdown", mime: "text/x-gfm", mode: "gfm", file: /^(readme|contributing|history).md$/i},
     {name: "Go", mime: "text/x-go", mode: "go", ext: ["go"]},
-    {name: "Groovy", mime: "text/x-groovy", mode: "groovy", ext: ["groovy"]},
+    {name: "Groovy", mime: "text/x-groovy", mode: "groovy", ext: ["groovy", "gradle"]},
     {name: "HAML", mime: "text/x-haml", mode: "haml", ext: ["haml"]},
     {name: "Haskell", mime: "text/x-haskell", mode: "haskell", ext: ["hs"]},
+    {name: "Haskell (Literate)", mime: "text/x-literate-haskell", mode: "haskell-literate", ext: ["lhs"]},
     {name: "Haxe", mime: "text/x-haxe", mode: "haxe", ext: ["hx"]},
     {name: "HXML", mime: "text/x-hxml", mode: "haxe", ext: ["hxml"]},
     {name: "ASP.NET", mime: "application/x-aspx", mode: "htmlembedded", ext: ["aspx"], alias: ["asp", "aspx"]},
@@ -11012,6 +10165,7 @@ CodeMirror.defineMIME("text/x-markdown", "markdown");
      mode: "javascript", ext: ["js"], alias: ["ecmascript", "js", "node"]},
     {name: "JSON", mimes: ["application/json", "application/x-json"], mode: "javascript", ext: ["json", "map"], alias: ["json5"]},
     {name: "JSON-LD", mime: "application/ld+json", mode: "javascript", ext: ["jsonld"], alias: ["jsonld"]},
+    {name: "JSX", mime: "text/jsx", mode: "jsx", ext: ["jsx"]},
     {name: "Jinja2", mime: "null", mode: "jinja2"},
     {name: "Julia", mime: "text/x-julia", mode: "julia", ext: ["jl"]},
     {name: "Kotlin", mime: "text/x-kotlin", mode: "clike", ext: ["kt"]},
@@ -11023,7 +10177,7 @@ CodeMirror.defineMIME("text/x-markdown", "markdown");
     {name: "MariaDB SQL", mime: "text/x-mariadb", mode: "sql"},
     {name: "Mathematica", mime: "text/x-mathematica", mode: "mathematica", ext: ["m", "nb"]},
     {name: "Modelica", mime: "text/x-modelica", mode: "modelica", ext: ["mo"]},
-    {name: "MUMPS", mime: "text/x-mumps", mode: "mumps"},
+    {name: "MUMPS", mime: "text/x-mumps", mode: "mumps", ext: ["mps"]},
     {name: "MS SQL", mime: "text/x-mssql", mode: "sql"},
     {name: "MySQL", mime: "text/x-mysql", mode: "sql"},
     {name: "Nginx", mime: "text/x-nginx-conf", mode: "nginx", file: /nginx.*\.conf$/i},
@@ -11041,6 +10195,7 @@ CodeMirror.defineMIME("text/x-markdown", "markdown");
     {name: "Plain Text", mime: "text/plain", mode: "null", ext: ["txt", "text", "conf", "def", "list", "log"]},
     {name: "PLSQL", mime: "text/x-plsql", mode: "sql", ext: ["pls"]},
     {name: "Properties files", mime: "text/x-properties", mode: "properties", ext: ["properties", "ini", "in"], alias: ["ini", "properties"]},
+    {name: "ProtoBuf", mime: "text/x-protobuf", mode: "protobuf", ext: ["proto"]},
     {name: "Python", mime: "text/x-python", mode: "python", ext: ["py", "pyw"]},
     {name: "Puppet", mime: "text/x-puppet", mode: "puppet", ext: ["pp"]},
     {name: "Q", mime: "text/x-q", mode: "q", ext: ["q"]},
@@ -11066,7 +10221,6 @@ CodeMirror.defineMIME("text/x-markdown", "markdown");
     {name: "SQL", mime: "text/x-sql", mode: "sql", ext: ["sql"]},
     {name: "Squirrel", mime: "text/x-squirrel", mode: "clike", ext: ["nut"]},
     {name: "Swift", mime: "text/x-swift", mode: "swift", ext: ["swift"]},
-    {name: "MariaDB", mime: "text/x-mariadb", mode: "sql"},
     {name: "sTeX", mime: "text/x-stex", mode: "stex"},
     {name: "LaTeX", mime: "text/x-latex", mode: "stex", ext: ["text", "ltx"], alias: ["tex"]},
     {name: "SystemVerilog", mime: "text/x-systemverilog", mode: "verilog", ext: ["v"]},
@@ -11076,7 +10230,7 @@ CodeMirror.defineMIME("text/x-markdown", "markdown");
     {name: "Tiki wiki", mime: "text/tiki", mode: "tiki"},
     {name: "TOML", mime: "text/x-toml", mode: "toml", ext: ["toml"]},
     {name: "Tornado", mime: "text/x-tornado", mode: "tornado"},
-    {name: "troff", mime: "troff", mode: "troff", ext: ["1", "2", "3", "4", "5", "6", "7", "8", "9"]},
+    {name: "troff", mime: "text/troff", mode: "troff", ext: ["1", "2", "3", "4", "5", "6", "7", "8", "9"]},
     {name: "TTCN", mime: "text/x-ttcn", mode: "ttcn", ext: ["ttcn", "ttcn3", "ttcnpp"]},
     {name: "TTCN_CFG", mime: "text/x-ttcn-cfg", mode: "ttcn-cfg", ext: ["cfg"]},
     {name: "Turtle", mime: "text/turtle", mode: "turtle", ext: ["ttl"]},
@@ -11140,7 +10294,7 @@ CodeMirror.defineMIME("text/x-markdown", "markdown");
   };
 });
 
-},{"../lib/codemirror":7}],11:[function(require,module,exports){
+},{"../lib/codemirror":5}],9:[function(require,module,exports){
 // CodeMirror, copyright (c) by Marijn Haverbeke and others
 // Distributed under an MIT license: http://codemirror.net/LICENSE
 
@@ -11154,54 +10308,56 @@ CodeMirror.defineMIME("text/x-markdown", "markdown");
 })(function(CodeMirror) {
 "use strict";
 
-CodeMirror.defineMode("xml", function(config, parserConfig) {
-  var indentUnit = config.indentUnit;
-  var multilineTagIndentFactor = parserConfig.multilineTagIndentFactor || 1;
-  var multilineTagIndentPastTag = parserConfig.multilineTagIndentPastTag;
-  if (multilineTagIndentPastTag == null) multilineTagIndentPastTag = true;
+var htmlConfig = {
+  autoSelfClosers: {'area': true, 'base': true, 'br': true, 'col': true, 'command': true,
+                    'embed': true, 'frame': true, 'hr': true, 'img': true, 'input': true,
+                    'keygen': true, 'link': true, 'meta': true, 'param': true, 'source': true,
+                    'track': true, 'wbr': true, 'menuitem': true},
+  implicitlyClosed: {'dd': true, 'li': true, 'optgroup': true, 'option': true, 'p': true,
+                     'rp': true, 'rt': true, 'tbody': true, 'td': true, 'tfoot': true,
+                     'th': true, 'tr': true},
+  contextGrabbers: {
+    'dd': {'dd': true, 'dt': true},
+    'dt': {'dd': true, 'dt': true},
+    'li': {'li': true},
+    'option': {'option': true, 'optgroup': true},
+    'optgroup': {'optgroup': true},
+    'p': {'address': true, 'article': true, 'aside': true, 'blockquote': true, 'dir': true,
+          'div': true, 'dl': true, 'fieldset': true, 'footer': true, 'form': true,
+          'h1': true, 'h2': true, 'h3': true, 'h4': true, 'h5': true, 'h6': true,
+          'header': true, 'hgroup': true, 'hr': true, 'menu': true, 'nav': true, 'ol': true,
+          'p': true, 'pre': true, 'section': true, 'table': true, 'ul': true},
+    'rp': {'rp': true, 'rt': true},
+    'rt': {'rp': true, 'rt': true},
+    'tbody': {'tbody': true, 'tfoot': true},
+    'td': {'td': true, 'th': true},
+    'tfoot': {'tbody': true},
+    'th': {'td': true, 'th': true},
+    'thead': {'tbody': true, 'tfoot': true},
+    'tr': {'tr': true}
+  },
+  doNotIndent: {"pre": true},
+  allowUnquoted: true,
+  allowMissing: true,
+  caseFold: true
+}
 
-  var Kludges = parserConfig.htmlMode ? {
-    autoSelfClosers: {'area': true, 'base': true, 'br': true, 'col': true, 'command': true,
-                      'embed': true, 'frame': true, 'hr': true, 'img': true, 'input': true,
-                      'keygen': true, 'link': true, 'meta': true, 'param': true, 'source': true,
-                      'track': true, 'wbr': true, 'menuitem': true},
-    implicitlyClosed: {'dd': true, 'li': true, 'optgroup': true, 'option': true, 'p': true,
-                       'rp': true, 'rt': true, 'tbody': true, 'td': true, 'tfoot': true,
-                       'th': true, 'tr': true},
-    contextGrabbers: {
-      'dd': {'dd': true, 'dt': true},
-      'dt': {'dd': true, 'dt': true},
-      'li': {'li': true},
-      'option': {'option': true, 'optgroup': true},
-      'optgroup': {'optgroup': true},
-      'p': {'address': true, 'article': true, 'aside': true, 'blockquote': true, 'dir': true,
-            'div': true, 'dl': true, 'fieldset': true, 'footer': true, 'form': true,
-            'h1': true, 'h2': true, 'h3': true, 'h4': true, 'h5': true, 'h6': true,
-            'header': true, 'hgroup': true, 'hr': true, 'menu': true, 'nav': true, 'ol': true,
-            'p': true, 'pre': true, 'section': true, 'table': true, 'ul': true},
-      'rp': {'rp': true, 'rt': true},
-      'rt': {'rp': true, 'rt': true},
-      'tbody': {'tbody': true, 'tfoot': true},
-      'td': {'td': true, 'th': true},
-      'tfoot': {'tbody': true},
-      'th': {'td': true, 'th': true},
-      'thead': {'tbody': true, 'tfoot': true},
-      'tr': {'tr': true}
-    },
-    doNotIndent: {"pre": true},
-    allowUnquoted: true,
-    allowMissing: true,
-    caseFold: true
-  } : {
-    autoSelfClosers: {},
-    implicitlyClosed: {},
-    contextGrabbers: {},
-    doNotIndent: {},
-    allowUnquoted: false,
-    allowMissing: false,
-    caseFold: false
-  };
-  var alignCDATA = parserConfig.alignCDATA;
+var xmlConfig = {
+  autoSelfClosers: {},
+  implicitlyClosed: {},
+  contextGrabbers: {},
+  doNotIndent: {},
+  allowUnquoted: false,
+  allowMissing: false,
+  caseFold: false
+}
+
+CodeMirror.defineMode("xml", function(editorConf, config_) {
+  var indentUnit = editorConf.indentUnit
+  var config = {}
+  var defaults = config_.htmlMode ? htmlConfig : xmlConfig
+  for (var prop in defaults) config[prop] = defaults[prop]
+  for (var prop in config_) config[prop] = config_[prop]
 
   // Return variables for tokenizers
   var type, setStyle;
@@ -11331,7 +10487,7 @@ CodeMirror.defineMode("xml", function(config, parserConfig) {
     this.tagName = tagName;
     this.indent = state.indented;
     this.startOfLine = startOfLine;
-    if (Kludges.doNotIndent.hasOwnProperty(tagName) || (state.context && state.context.noIndent))
+    if (config.doNotIndent.hasOwnProperty(tagName) || (state.context && state.context.noIndent))
       this.noIndent = true;
   }
   function popContext(state) {
@@ -11344,8 +10500,8 @@ CodeMirror.defineMode("xml", function(config, parserConfig) {
         return;
       }
       parentTagName = state.context.tagName;
-      if (!Kludges.contextGrabbers.hasOwnProperty(parentTagName) ||
-          !Kludges.contextGrabbers[parentTagName].hasOwnProperty(nextTagName)) {
+      if (!config.contextGrabbers.hasOwnProperty(parentTagName) ||
+          !config.contextGrabbers[parentTagName].hasOwnProperty(nextTagName)) {
         return;
       }
       popContext(state);
@@ -11376,9 +10532,9 @@ CodeMirror.defineMode("xml", function(config, parserConfig) {
     if (type == "word") {
       var tagName = stream.current();
       if (state.context && state.context.tagName != tagName &&
-          Kludges.implicitlyClosed.hasOwnProperty(state.context.tagName))
+          config.implicitlyClosed.hasOwnProperty(state.context.tagName))
         popContext(state);
-      if (state.context && state.context.tagName == tagName) {
+      if ((state.context && state.context.tagName == tagName) || config.matchClosing === false) {
         setStyle = "tag";
         return closeState;
       } else {
@@ -11412,7 +10568,7 @@ CodeMirror.defineMode("xml", function(config, parserConfig) {
       var tagName = state.tagName, tagStart = state.tagStart;
       state.tagName = state.tagStart = null;
       if (type == "selfcloseTag" ||
-          Kludges.autoSelfClosers.hasOwnProperty(tagName)) {
+          config.autoSelfClosers.hasOwnProperty(tagName)) {
         maybePopContext(state, tagName);
       } else {
         maybePopContext(state, tagName);
@@ -11425,12 +10581,12 @@ CodeMirror.defineMode("xml", function(config, parserConfig) {
   }
   function attrEqState(type, stream, state) {
     if (type == "equals") return attrValueState;
-    if (!Kludges.allowMissing) setStyle = "error";
+    if (!config.allowMissing) setStyle = "error";
     return attrState(type, stream, state);
   }
   function attrValueState(type, stream, state) {
     if (type == "string") return attrContinuedState;
-    if (type == "word" && Kludges.allowUnquoted) {setStyle = "string"; return attrState;}
+    if (type == "word" && config.allowUnquoted) {setStyle = "string"; return attrState;}
     setStyle = "error";
     return attrState(type, stream, state);
   }
@@ -11440,12 +10596,14 @@ CodeMirror.defineMode("xml", function(config, parserConfig) {
   }
 
   return {
-    startState: function() {
-      return {tokenize: inText,
-              state: baseState,
-              indented: 0,
-              tagName: null, tagStart: null,
-              context: null};
+    startState: function(baseIndent) {
+      var state = {tokenize: inText,
+                   state: baseState,
+                   indented: baseIndent || 0,
+                   tagName: null, tagStart: null,
+                   context: null}
+      if (baseIndent != null) state.baseIndent = baseIndent
+      return state
     },
 
     token: function(stream, state) {
@@ -11478,19 +10636,19 @@ CodeMirror.defineMode("xml", function(config, parserConfig) {
         return fullLine ? fullLine.match(/^(\s*)/)[0].length : 0;
       // Indent the starts of attribute names.
       if (state.tagName) {
-        if (multilineTagIndentPastTag)
+        if (config.multilineTagIndentPastTag !== false)
           return state.tagStart + state.tagName.length + 2;
         else
-          return state.tagStart + indentUnit * multilineTagIndentFactor;
+          return state.tagStart + indentUnit * (config.multilineTagIndentFactor || 1);
       }
-      if (alignCDATA && /<!\[CDATA\[/.test(textAfter)) return 0;
+      if (config.alignCDATA && /<!\[CDATA\[/.test(textAfter)) return 0;
       var tagAfter = textAfter && /^<(\/)?([\w_:\.-]*)/.exec(textAfter);
       if (tagAfter && tagAfter[1]) { // Closing tag spotted
         while (context) {
           if (context.tagName == tagAfter[2]) {
             context = context.prev;
             break;
-          } else if (Kludges.implicitlyClosed.hasOwnProperty(context.tagName)) {
+          } else if (config.implicitlyClosed.hasOwnProperty(context.tagName)) {
             context = context.prev;
           } else {
             break;
@@ -11498,25 +10656,30 @@ CodeMirror.defineMode("xml", function(config, parserConfig) {
         }
       } else if (tagAfter) { // Opening tag spotted
         while (context) {
-          var grabbers = Kludges.contextGrabbers[context.tagName];
+          var grabbers = config.contextGrabbers[context.tagName];
           if (grabbers && grabbers.hasOwnProperty(tagAfter[2]))
             context = context.prev;
           else
             break;
         }
       }
-      while (context && !context.startOfLine)
+      while (context && context.prev && !context.startOfLine)
         context = context.prev;
       if (context) return context.indent + indentUnit;
-      else return 0;
+      else return state.baseIndent || 0;
     },
 
     electricInput: /<\/[\s\w:]+>$/,
     blockCommentStart: "<!--",
     blockCommentEnd: "-->",
 
-    configuration: parserConfig.htmlMode ? "html" : "xml",
-    helperType: parserConfig.htmlMode ? "html" : "xml"
+    configuration: config.htmlMode ? "html" : "xml",
+    helperType: config.htmlMode ? "html" : "xml",
+
+    skipAttribute: function(state) {
+      if (state.state == attrValueState)
+        state.state = attrState
+    }
   };
 });
 
@@ -11527,7 +10690,7 @@ if (!CodeMirror.mimeModes.hasOwnProperty("text/html"))
 
 });
 
-},{"../../lib/codemirror":7}],12:[function(require,module,exports){
+},{"../../lib/codemirror":5}],10:[function(require,module,exports){
 (function (global){
 /**
  * marked - a markdown parser
@@ -12816,7 +11979,7 @@ if (typeof module !== 'undefined' && typeof exports === 'object') {
 }());
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{}],13:[function(require,module,exports){
+},{}],11:[function(require,module,exports){
 // CodeMirror, copyright (c) by Marijn Haverbeke and others
 // Distributed under an MIT license: http://codemirror.net/LICENSE
 
@@ -12862,7 +12025,7 @@ CodeMirror.commands.shiftTabAndUnindentMarkdownList = function (cm) {
 	}
 };
 
-},{"codemirror":7}],14:[function(require,module,exports){
+},{"codemirror":5}],12:[function(require,module,exports){
 /*global require,module*/
 "use strict";
 var CodeMirror = require("codemirror");
@@ -12874,7 +12037,7 @@ require("codemirror/addon/mode/overlay.js");
 require("codemirror/addon/display/placeholder.js");
 require("codemirror/mode/gfm/gfm.js");
 require("codemirror/mode/xml/xml.js");
-require("spell-checker");
+//require("spell-checker");
 var marked = require("marked");
 
 
@@ -12883,62 +12046,62 @@ var isMac = /Mac/.test(navigator.platform);
 
 // Mapping of actions that can be bound to keyboard shortcuts or toolbar buttons
 var bindings = {
-	"toggleBold": toggleBold,
-	"toggleItalic": toggleItalic,
-	"drawLink": drawLink,
-	"toggleHeadingSmaller": toggleHeadingSmaller,
-	"toggleHeadingBigger": toggleHeadingBigger,
-	"drawImage": drawImage,
-	"toggleBlockquote": toggleBlockquote,
-	"toggleOrderedList": toggleOrderedList,
-	"toggleUnorderedList": toggleUnorderedList,
-	"toggleCodeBlock": toggleCodeBlock,
-	"togglePreview": togglePreview,
-	"toggleStrikethrough": toggleStrikethrough,
-	"toggleHeading1": toggleHeading1,
-	"toggleHeading2": toggleHeading2,
-	"toggleHeading3": toggleHeading3,
-	"cleanBlock": cleanBlock,
-	"drawTable": drawTable,
-	"drawHorizontalRule": drawHorizontalRule,
-	"undo": undo,
-	"redo": redo,
-	"toggleSideBySide": toggleSideBySide,
-	"toggleFullScreen": toggleFullScreen
+    "toggleBold": toggleBold,
+    "toggleItalic": toggleItalic,
+    "drawLink": drawLink,
+    "toggleHeadingSmaller": toggleHeadingSmaller,
+    "toggleHeadingBigger": toggleHeadingBigger,
+    "drawImage": drawImage,
+    "toggleBlockquote": toggleBlockquote,
+    "toggleOrderedList": toggleOrderedList,
+    "toggleUnorderedList": toggleUnorderedList,
+    "toggleCodeBlock": toggleCodeBlock,
+    "togglePreview": togglePreview,
+    "toggleStrikethrough": toggleStrikethrough,
+    "toggleHeading1": toggleHeading1,
+    "toggleHeading2": toggleHeading2,
+    "toggleHeading3": toggleHeading3,
+    "cleanBlock": cleanBlock,
+    "drawTable": drawTable,
+    "drawHorizontalRule": drawHorizontalRule,
+    "undo": undo,
+    "redo": redo,
+    "toggleSideBySide": toggleSideBySide,
+    "toggleFullScreen": toggleFullScreen
 };
 
 var shortcuts = {
-	"toggleBold": "Cmd-B",
-	"toggleItalic": "Cmd-I",
-	"drawLink": "Cmd-K",
-	"toggleHeadingSmaller": "Cmd-H",
-	"toggleHeadingBigger": "Shift-Cmd-H",
-	"cleanBlock": "Cmd-E",
-	"drawImage": "Cmd-Alt-I",
-	"toggleBlockquote": "Cmd-'",
-	"toggleOrderedList": "Cmd-Alt-L",
-	"toggleUnorderedList": "Cmd-L",
-	"toggleCodeBlock": "Cmd-Alt-C",
-	"togglePreview": "Cmd-P",
-	"toggleSideBySide": "F9",
-	"toggleFullScreen": "F11"
+    "toggleBold": "Cmd-B",
+    "toggleItalic": "Cmd-I",
+    "drawLink": "Cmd-K",
+    "toggleHeadingSmaller": "Cmd-H",
+    "toggleHeadingBigger": "Shift-Cmd-H",
+    "cleanBlock": "Cmd-E",
+    "drawImage": "Cmd-Alt-I",
+    "toggleBlockquote": "Cmd-'",
+    "toggleOrderedList": "Cmd-Alt-L",
+    "toggleUnorderedList": "Cmd-L",
+    "toggleCodeBlock": "Cmd-Alt-C",
+    "togglePreview": "Cmd-P",
+    "toggleSideBySide": "F9",
+    "toggleFullScreen": "F11"
 };
 
 var getBindingName = function(f) {
-	for(var key in bindings) {
-		if(bindings[key] === f) {
-			return key;
-		}
-	}
-	return null;
+    for (var key in bindings) {
+        if (bindings[key] === f) {
+            return key;
+        }
+    }
+    return null;
 };
 
 var isMobile = function() {
-	var check = false;
-	(function(a) {
-		if(/(android|bb\d+|meego).+mobile|avantgo|bada\/|blackberry|blazer|compal|elaine|fennec|hiptop|iemobile|ip(hone|od)|iris|kindle|lge |maemo|midp|mmp|mobile.+firefox|netfront|opera m(ob|in)i|palm( os)?|phone|p(ixi|re)\/|plucker|pocket|psp|series(4|6)0|symbian|treo|up\.(browser|link)|vodafone|wap|windows ce|xda|xiino|android|ipad|playbook|silk/i.test(a) || /1207|6310|6590|3gso|4thp|50[1-6]i|770s|802s|a wa|abac|ac(er|oo|s\-)|ai(ko|rn)|al(av|ca|co)|amoi|an(ex|ny|yw)|aptu|ar(ch|go)|as(te|us)|attw|au(di|\-m|r |s )|avan|be(ck|ll|nq)|bi(lb|rd)|bl(ac|az)|br(e|v)w|bumb|bw\-(n|u)|c55\/|capi|ccwa|cdm\-|cell|chtm|cldc|cmd\-|co(mp|nd)|craw|da(it|ll|ng)|dbte|dc\-s|devi|dica|dmob|do(c|p)o|ds(12|\-d)|el(49|ai)|em(l2|ul)|er(ic|k0)|esl8|ez([4-7]0|os|wa|ze)|fetc|fly(\-|_)|g1 u|g560|gene|gf\-5|g\-mo|go(\.w|od)|gr(ad|un)|haie|hcit|hd\-(m|p|t)|hei\-|hi(pt|ta)|hp( i|ip)|hs\-c|ht(c(\-| |_|a|g|p|s|t)|tp)|hu(aw|tc)|i\-(20|go|ma)|i230|iac( |\-|\/)|ibro|idea|ig01|ikom|im1k|inno|ipaq|iris|ja(t|v)a|jbro|jemu|jigs|kddi|keji|kgt( |\/)|klon|kpt |kwc\-|kyo(c|k)|le(no|xi)|lg( g|\/(k|l|u)|50|54|\-[a-w])|libw|lynx|m1\-w|m3ga|m50\/|ma(te|ui|xo)|mc(01|21|ca)|m\-cr|me(rc|ri)|mi(o8|oa|ts)|mmef|mo(01|02|bi|de|do|t(\-| |o|v)|zz)|mt(50|p1|v )|mwbp|mywa|n10[0-2]|n20[2-3]|n30(0|2)|n50(0|2|5)|n7(0(0|1)|10)|ne((c|m)\-|on|tf|wf|wg|wt)|nok(6|i)|nzph|o2im|op(ti|wv)|oran|owg1|p800|pan(a|d|t)|pdxg|pg(13|\-([1-8]|c))|phil|pire|pl(ay|uc)|pn\-2|po(ck|rt|se)|prox|psio|pt\-g|qa\-a|qc(07|12|21|32|60|\-[2-7]|i\-)|qtek|r380|r600|raks|rim9|ro(ve|zo)|s55\/|sa(ge|ma|mm|ms|ny|va)|sc(01|h\-|oo|p\-)|sdk\/|se(c(\-|0|1)|47|mc|nd|ri)|sgh\-|shar|sie(\-|m)|sk\-0|sl(45|id)|sm(al|ar|b3|it|t5)|so(ft|ny)|sp(01|h\-|v\-|v )|sy(01|mb)|t2(18|50)|t6(00|10|18)|ta(gt|lk)|tcl\-|tdg\-|tel(i|m)|tim\-|t\-mo|to(pl|sh)|ts(70|m\-|m3|m5)|tx\-9|up(\.b|g1|si)|utst|v400|v750|veri|vi(rg|te)|vk(40|5[0-3]|\-v)|vm40|voda|vulc|vx(52|53|60|61|70|80|81|83|85|98)|w3c(\-| )|webc|whit|wi(g |nc|nw)|wmlb|wonu|x700|yas\-|your|zeto|zte\-/i.test(a.substr(0, 4))) check = true;
-	})(navigator.userAgent || navigator.vendor || window.opera);
-	return check;
+    var check = false;
+    (function(a) {
+        if (/(android|bb\d+|meego).+mobile|avantgo|bada\/|blackberry|blazer|compal|elaine|fennec|hiptop|iemobile|ip(hone|od)|iris|kindle|lge |maemo|midp|mmp|mobile.+firefox|netfront|opera m(ob|in)i|palm( os)?|phone|p(ixi|re)\/|plucker|pocket|psp|series(4|6)0|symbian|treo|up\.(browser|link)|vodafone|wap|windows ce|xda|xiino|android|ipad|playbook|silk/i.test(a) || /1207|6310|6590|3gso|4thp|50[1-6]i|770s|802s|a wa|abac|ac(er|oo|s\-)|ai(ko|rn)|al(av|ca|co)|amoi|an(ex|ny|yw)|aptu|ar(ch|go)|as(te|us)|attw|au(di|\-m|r |s )|avan|be(ck|ll|nq)|bi(lb|rd)|bl(ac|az)|br(e|v)w|bumb|bw\-(n|u)|c55\/|capi|ccwa|cdm\-|cell|chtm|cldc|cmd\-|co(mp|nd)|craw|da(it|ll|ng)|dbte|dc\-s|devi|dica|dmob|do(c|p)o|ds(12|\-d)|el(49|ai)|em(l2|ul)|er(ic|k0)|esl8|ez([4-7]0|os|wa|ze)|fetc|fly(\-|_)|g1 u|g560|gene|gf\-5|g\-mo|go(\.w|od)|gr(ad|un)|haie|hcit|hd\-(m|p|t)|hei\-|hi(pt|ta)|hp( i|ip)|hs\-c|ht(c(\-| |_|a|g|p|s|t)|tp)|hu(aw|tc)|i\-(20|go|ma)|i230|iac( |\-|\/)|ibro|idea|ig01|ikom|im1k|inno|ipaq|iris|ja(t|v)a|jbro|jemu|jigs|kddi|keji|kgt( |\/)|klon|kpt |kwc\-|kyo(c|k)|le(no|xi)|lg( g|\/(k|l|u)|50|54|\-[a-w])|libw|lynx|m1\-w|m3ga|m50\/|ma(te|ui|xo)|mc(01|21|ca)|m\-cr|me(rc|ri)|mi(o8|oa|ts)|mmef|mo(01|02|bi|de|do|t(\-| |o|v)|zz)|mt(50|p1|v )|mwbp|mywa|n10[0-2]|n20[2-3]|n30(0|2)|n50(0|2|5)|n7(0(0|1)|10)|ne((c|m)\-|on|tf|wf|wg|wt)|nok(6|i)|nzph|o2im|op(ti|wv)|oran|owg1|p800|pan(a|d|t)|pdxg|pg(13|\-([1-8]|c))|phil|pire|pl(ay|uc)|pn\-2|po(ck|rt|se)|prox|psio|pt\-g|qa\-a|qc(07|12|21|32|60|\-[2-7]|i\-)|qtek|r380|r600|raks|rim9|ro(ve|zo)|s55\/|sa(ge|ma|mm|ms|ny|va)|sc(01|h\-|oo|p\-)|sdk\/|se(c(\-|0|1)|47|mc|nd|ri)|sgh\-|shar|sie(\-|m)|sk\-0|sl(45|id)|sm(al|ar|b3|it|t5)|so(ft|ny)|sp(01|h\-|v\-|v )|sy(01|mb)|t2(18|50)|t6(00|10|18)|ta(gt|lk)|tcl\-|tdg\-|tel(i|m)|tim\-|t\-mo|to(pl|sh)|ts(70|m\-|m3|m5)|tx\-9|up(\.b|g1|si)|utst|v400|v750|veri|vi(rg|te)|vk(40|5[0-3]|\-v)|vm40|voda|vulc|vx(52|53|60|61|70|80|81|83|85|98)|w3c(\-| )|webc|whit|wi(g |nc|nw)|wmlb|wonu|x700|yas\-|your|zeto|zte\-/i.test(a.substr(0, 4))) check = true;
+    })(navigator.userAgent || navigator.vendor || window.opera);
+    return check;
 };
 
 
@@ -12946,12 +12109,12 @@ var isMobile = function() {
  * Fix shortcut. Mac use Command, others use Ctrl.
  */
 function fixShortcut(name) {
-	if(isMac) {
-		name = name.replace("Ctrl", "Cmd");
-	} else {
-		name = name.replace("Cmd", "Ctrl");
-	}
-	return name;
+    if (isMac) {
+        name = name.replace("Ctrl", "Cmd");
+    } else {
+        name = name.replace("Cmd", "Ctrl");
+    }
+    return name;
 }
 
 
@@ -12959,87 +12122,87 @@ function fixShortcut(name) {
  * Create icon element for toolbar.
  */
 function createIcon(options, enableTooltips, shortcuts) {
-	options = options || {};
-	var el = document.createElement("a");
-	enableTooltips = (enableTooltips == undefined) ? true : enableTooltips;
+    options = options || {};
+    var el = document.createElement("a");
+    enableTooltips = (enableTooltips == undefined) ? true : enableTooltips;
 
-	if(options.title && enableTooltips) {
-		el.title = createTootlip(options.title, options.action, shortcuts);
+    if (options.title && enableTooltips) {
+        el.title = createTootlip(options.title, options.action, shortcuts);
 
-		if(isMac) {
-			el.title = el.title.replace("Ctrl", "⌘");
-			el.title = el.title.replace("Alt", "⌥");
-		}
-	}
+        if (isMac) {
+            el.title = el.title.replace("Ctrl", "⌘");
+            el.title = el.title.replace("Alt", "⌥");
+        }
+    }
 
-	el.tabIndex = -1;
-	el.className = options.className;
-	return el;
+    el.tabIndex = -1;
+    el.className = options.className;
+    return el;
 }
 
 function createSep() {
-	var el = document.createElement("i");
-	el.className = "separator";
-	el.innerHTML = "|";
-	return el;
+    var el = document.createElement("i");
+    el.className = "separator";
+    el.innerHTML = "|";
+    return el;
 }
 
 function createTootlip(title, action, shortcuts) {
-	var actionName;
-	var tooltip = title;
+    var actionName;
+    var tooltip = title;
 
-	if(action) {
-		actionName = getBindingName(action);
-		if(shortcuts[actionName]) {
-			tooltip += " (" + fixShortcut(shortcuts[actionName]) + ")";
-		}
-	}
+    if (action) {
+        actionName = getBindingName(action);
+        if (shortcuts[actionName]) {
+            tooltip += " (" + fixShortcut(shortcuts[actionName]) + ")";
+        }
+    }
 
-	return tooltip;
+    return tooltip;
 }
 
 /**
  * The state of CodeMirror at the given position.
  */
 function getState(cm, pos) {
-	pos = pos || cm.getCursor("start");
-	var stat = cm.getTokenAt(pos);
-	if(!stat.type) return {};
+    pos = pos || cm.getCursor("start");
+    var stat = cm.getTokenAt(pos);
+    if (!stat.type) return {};
 
-	var types = stat.type.split(" ");
+    var types = stat.type.split(" ");
 
-	var ret = {},
-		data, text;
-	for(var i = 0; i < types.length; i++) {
-		data = types[i];
-		if(data === "strong") {
-			ret.bold = true;
-		} else if(data === "variable-2") {
-			text = cm.getLine(pos.line);
-			if(/^\s*\d+\.\s/.test(text)) {
-				ret["ordered-list"] = true;
-			} else {
-				ret["unordered-list"] = true;
-			}
-		} else if(data === "atom") {
-			ret.quote = true;
-		} else if(data === "em") {
-			ret.italic = true;
-		} else if(data === "quote") {
-			ret.quote = true;
-		} else if(data === "strikethrough") {
-			ret.strikethrough = true;
-		} else if(data === "comment") {
-			ret.code = true;
-		} else if(data === "link") {
-			ret.link = true;
-		} else if(data === "tag") {
-			ret.image = true;
-		} else if(data.match(/^header(\-[1-6])?$/)) {
-			ret[data.replace("header", "heading")] = true;
-		}
-	}
-	return ret;
+    var ret = {},
+        data, text;
+    for (var i = 0; i < types.length; i++) {
+        data = types[i];
+        if (data === "strong") {
+            ret.bold = true;
+        } else if (data === "variable-2") {
+            text = cm.getLine(pos.line);
+            if (/^\s*\d+\.\s/.test(text)) {
+                ret["ordered-list"] = true;
+            } else {
+                ret["unordered-list"] = true;
+            }
+        } else if (data === "atom") {
+            ret.quote = true;
+        } else if (data === "em") {
+            ret.italic = true;
+        } else if (data === "quote") {
+            ret.quote = true;
+        } else if (data === "strikethrough") {
+            ret.strikethrough = true;
+        } else if (data === "comment") {
+            ret.code = true;
+        } else if (data === "link") {
+            ret.link = true;
+        } else if (data === "tag") {
+            ret.image = true;
+        } else if (data.match(/^header(\-[1-6])?$/)) {
+            ret[data.replace("header", "heading")] = true;
+        }
+    }
+    return ret;
 }
 
 
@@ -13050,44 +12213,44 @@ var saved_overflow = "";
  * Toggle full screen of the editor.
  */
 function toggleFullScreen(editor) {
-	// Set fullscreen
-	var cm = editor.codemirror;
-	cm.setOption("fullScreen", !cm.getOption("fullScreen"));
+    // Set fullscreen
+    var cm = editor.codemirror;
+    cm.setOption("fullScreen", !cm.getOption("fullScreen"));
 
 
-	// Prevent scrolling on body during fullscreen active
-	if(cm.getOption("fullScreen")) {
-		saved_overflow = document.body.style.overflow;
-		document.body.style.overflow = "hidden";
-	} else {
-		document.body.style.overflow = saved_overflow;
-	}
+    // Prevent scrolling on body during fullscreen active
+    if (cm.getOption("fullScreen")) {
+        saved_overflow = document.body.style.overflow;
+        document.body.style.overflow = "hidden";
+    } else {
+        document.body.style.overflow = saved_overflow;
+    }
 
 
-	// Update toolbar class
-	var wrap = cm.getWrapperElement();
+    // Update toolbar class
+    var wrap = cm.getWrapperElement();
 
-	if(!/fullscreen/.test(wrap.previousSibling.className)) {
-		wrap.previousSibling.className += " fullscreen";
-	} else {
-		wrap.previousSibling.className = wrap.previousSibling.className.replace(/\s*fullscreen\b/, "");
-	}
-
-
-	// Update toolbar button
-	var toolbarButton = editor.toolbarElements.fullscreen;
-
-	if(!/active/.test(toolbarButton.className)) {
-		toolbarButton.className += " active";
-	} else {
-		toolbarButton.className = toolbarButton.className.replace(/\s*active\s*/g, "");
-	}
+    if (!/fullscreen/.test(wrap.previousSibling.className)) {
+        wrap.previousSibling.className += " fullscreen";
+    } else {
+        wrap.previousSibling.className = wrap.previousSibling.className.replace(/\s*fullscreen\b/, "");
+    }
 
 
-	// Hide side by side if needed
-	var sidebyside = cm.getWrapperElement().nextSibling;
-	if(/editor-preview-active-side/.test(sidebyside.className))
-		toggleSideBySide(editor);
+    // Update toolbar button
+    var toolbarButton = editor.toolbarElements.fullscreen;
+
+    if (!/active/.test(toolbarButton.className)) {
+        toolbarButton.className += " active";
+    } else {
+        toolbarButton.className = toolbarButton.className.replace(/\s*active\s*/g, "");
+    }
+
+
+    // Hide side by side if needed
+    var sidebyside = cm.getWrapperElement().nextSibling;
+    if (/editor-preview-active-side/.test(sidebyside.className))
+        toggleSideBySide(editor);
 }
 
 
@@ -13095,7 +12258,7 @@ function toggleFullScreen(editor) {
  * Action for toggling bold.
  */
 function toggleBold(editor) {
-	_toggleBlock(editor, "bold", editor.options.blockStyles.bold);
+    _toggleBlock(editor, "bold", editor.options.blockStyles.bold);
 }
 
 
@@ -13103,7 +12266,7 @@ function toggleBold(editor) {
  * Action for toggling italic.
  */
 function toggleItalic(editor) {
-	_toggleBlock(editor, "italic", editor.options.blockStyles.italic);
+    _toggleBlock(editor, "italic", editor.options.blockStyles.italic);
 }
 
 
@@ -13111,62 +12274,62 @@ function toggleItalic(editor) {
  * Action for toggling strikethrough.
  */
 function toggleStrikethrough(editor) {
-	_toggleBlock(editor, "strikethrough", "~~");
+    _toggleBlock(editor, "strikethrough", "~~");
 }
 
 /**
  * Action for toggling code block.
  */
 function toggleCodeBlock(editor) {
-	_toggleBlock(editor, "code", "```\r\n", "\r\n```");
+    _toggleBlock(editor, "code", "```\r\n", "\r\n```");
 }
 
 /**
  * Action for toggling blockquote.
  */
 function toggleBlockquote(editor) {
-	var cm = editor.codemirror;
-	_toggleLine(cm, "quote");
+    var cm = editor.codemirror;
+    _toggleLine(cm, "quote");
 }
 
 /**
  * Action for toggling heading size: normal -> h1 -> h2 -> h3 -> h4 -> h5 -> h6 -> normal
  */
 function toggleHeadingSmaller(editor) {
-	var cm = editor.codemirror;
-	_toggleHeading(cm, "smaller");
+    var cm = editor.codemirror;
+    _toggleHeading(cm, "smaller");
 }
 
 /**
  * Action for toggling heading size: normal -> h6 -> h5 -> h4 -> h3 -> h2 -> h1 -> normal
  */
 function toggleHeadingBigger(editor) {
-	var cm = editor.codemirror;
-	_toggleHeading(cm, "bigger");
+    var cm = editor.codemirror;
+    _toggleHeading(cm, "bigger");
 }
 
 /**
  * Action for toggling heading size 1
  */
 function toggleHeading1(editor) {
-	var cm = editor.codemirror;
-	_toggleHeading(cm, undefined, 1);
+    var cm = editor.codemirror;
+    _toggleHeading(cm, undefined, 1);
 }
 
 /**
  * Action for toggling heading size 2
  */
 function toggleHeading2(editor) {
-	var cm = editor.codemirror;
-	_toggleHeading(cm, undefined, 2);
+    var cm = editor.codemirror;
+    _toggleHeading(cm, undefined, 2);
 }
 
 /**
  * Action for toggling heading size 3
  */
 function toggleHeading3(editor) {
-	var cm = editor.codemirror;
-	_toggleHeading(cm, undefined, 3);
+    var cm = editor.codemirror;
+    _toggleHeading(cm, undefined, 3);
 }
 
 
@@ -13174,8 +12337,8 @@ function toggleHeading3(editor) {
  * Action for toggling ul.
  */
 function toggleUnorderedList(editor) {
-	var cm = editor.codemirror;
-	_toggleLine(cm, "unordered-list");
+    var cm = editor.codemirror;
+    _toggleLine(cm, "unordered-list");
 }
 
 
@@ -13183,56 +12346,56 @@ function toggleUnorderedList(editor) {
  * Action for toggling ol.
  */
 function toggleOrderedList(editor) {
-	var cm = editor.codemirror;
-	_toggleLine(cm, "ordered-list");
+    var cm = editor.codemirror;
+    _toggleLine(cm, "ordered-list");
 }
 
 /**
  * Action for clean block (remove headline, list, blockquote code, markers)
  */
 function cleanBlock(editor) {
-	var cm = editor.codemirror;
-	_cleanBlock(cm);
+    var cm = editor.codemirror;
+    _cleanBlock(cm);
 }
 
 /**
  * Action for drawing a link.
  */
 function drawLink(editor) {
-	var cm = editor.codemirror;
-	var stat = getState(cm);
-	var options = editor.options;
-	_replaceSelection(cm, stat.link, options.insertTexts.link);
+    var cm = editor.codemirror;
+    var stat = getState(cm);
+    var options = editor.options;
+    _replaceSelection(cm, stat.link, options.insertTexts.link);
 }
 
 /**
  * Action for drawing an img.
  */
 function drawImage(editor) {
-	var cm = editor.codemirror;
-	var stat = getState(cm);
-	var options = editor.options;
-	_replaceSelection(cm, stat.image, options.insertTexts.image);
+    var cm = editor.codemirror;
+    var stat = getState(cm);
+    var options = editor.options;
+    _replaceSelection(cm, stat.image, options.insertTexts.image);
 }
 
 /**
  * Action for drawing a table.
  */
 function drawTable(editor) {
-	var cm = editor.codemirror;
-	var stat = getState(cm);
-	var options = editor.options;
-	_replaceSelection(cm, stat.table, options.insertTexts.table);
+    var cm = editor.codemirror;
+    var stat = getState(cm);
+    var options = editor.options;
+    _replaceSelection(cm, stat.table, options.insertTexts.table);
 }
 
 /**
  * Action for drawing a horizontal rule.
  */
 function drawHorizontalRule(editor) {
-	var cm = editor.codemirror;
-	var stat = getState(cm);
-	var options = editor.options;
-	_replaceSelection(cm, stat.image, options.insertTexts.horizontalRule);
+    var cm = editor.codemirror;
+    var stat = getState(cm);
+    var options = editor.options;
+    _replaceSelection(cm, stat.image, options.insertTexts.horizontalRule);
 }
 
 
@@ -13240,9 +12403,9 @@ function drawHorizontalRule(editor) {
  * Undo action.
  */
 function undo(editor) {
-	var cm = editor.codemirror;
-	cm.undo();
-	cm.focus();
+    var cm = editor.codemirror;
+    cm.undo();
+    cm.focus();
 }
 
 
@@ -13250,9 +12413,9 @@ function undo(editor) {
  * Redo action.
  */
 function redo(editor) {
-	var cm = editor.codemirror;
-	cm.redo();
-	cm.focus();
+    var cm = editor.codemirror;
+    cm.redo();
+    cm.focus();
 }
 
 
@@ -13260,57 +12423,57 @@ function redo(editor) {
  * Toggle side by side preview
  */
 function toggleSideBySide(editor) {
-	var cm = editor.codemirror;
-	var wrapper = cm.getWrapperElement();
-	var preview = wrapper.nextSibling;
-	var toolbarButton = editor.toolbarElements["side-by-side"];
-	var useSideBySideListener = false;
-	if(/editor-preview-active-side/.test(preview.className)) {
-		preview.className = preview.className.replace(
-			/\s*editor-preview-active-side\s*/g, ""
-		);
-		toolbarButton.className = toolbarButton.className.replace(/\s*active\s*/g, "");
-		wrapper.className = wrapper.className.replace(/\s*CodeMirror-sided\s*/g, " ");
-	} else {
-		// When the preview button is clicked for the first time,
-		// give some time for the transition from editor.css to fire and the view to slide from right to left,
-		// instead of just appearing.
-		setTimeout(function() {
-			if(!cm.getOption("fullScreen"))
-				toggleFullScreen(editor);
-			preview.className += " editor-preview-active-side";
-		}, 1);
-		toolbarButton.className += " active";
-		wrapper.className += " CodeMirror-sided";
-		useSideBySideListener = true;
-	}
+    var cm = editor.codemirror;
+    var wrapper = cm.getWrapperElement();
+    var preview = wrapper.nextSibling;
+    var toolbarButton = editor.toolbarElements["side-by-side"];
+    var useSideBySideListener = false;
+    if (/editor-preview-active-side/.test(preview.className)) {
+        preview.className = preview.className.replace(
+            /\s*editor-preview-active-side\s*/g, ""
+        );
+        toolbarButton.className = toolbarButton.className.replace(/\s*active\s*/g, "");
+        wrapper.className = wrapper.className.replace(/\s*CodeMirror-sided\s*/g, " ");
+    } else {
+        // When the preview button is clicked for the first time,
+        // give some time for the transition from editor.css to fire and the view to slide from right to left,
+        // instead of just appearing.
+        setTimeout(function() {
+            if (!cm.getOption("fullScreen"))
+                toggleFullScreen(editor);
+            preview.className += " editor-preview-active-side";
+        }, 1);
+        toolbarButton.className += " active";
+        wrapper.className += " CodeMirror-sided";
+        useSideBySideListener = true;
+    }
 
-	// Hide normal preview if active
-	var previewNormal = wrapper.lastChild;
-	if(/editor-preview-active/.test(previewNormal.className)) {
-		previewNormal.className = previewNormal.className.replace(
-			/\s*editor-preview-active\s*/g, ""
-		);
-		var toolbar = editor.toolbarElements.preview;
-		var toolbar_div = wrapper.previousSibling;
-		toolbar.className = toolbar.className.replace(/\s*active\s*/g, "");
-		toolbar_div.className = toolbar_div.className.replace(/\s*disabled-for-preview*/g, "");
-	}
+    // Hide normal preview if active
+    var previewNormal = wrapper.lastChild;
+    if (/editor-preview-active/.test(previewNormal.className)) {
+        previewNormal.className = previewNormal.className.replace(
+            /\s*editor-preview-active\s*/g, ""
+        );
+        var toolbar = editor.toolbarElements.preview;
+        var toolbar_div = wrapper.previousSibling;
+        toolbar.className = toolbar.className.replace(/\s*active\s*/g, "");
+        toolbar_div.className = toolbar_div.className.replace(/\s*disabled-for-preview*/g, "");
+    }
 
-	var sideBySideRenderingFunction = function() {
-		preview.innerHTML = editor.options.previewRender(editor.value(), preview);
-	};
+    var sideBySideRenderingFunction = function() {
+        preview.innerHTML = editor.options.previewRender(editor.value(), preview);
+    };
 
-	if(!cm.sideBySideRenderingFunction) {
-		cm.sideBySideRenderingFunction = sideBySideRenderingFunction;
-	}
+    if (!cm.sideBySideRenderingFunction) {
+        cm.sideBySideRenderingFunction = sideBySideRenderingFunction;
+    }
 
-	if(useSideBySideListener) {
-		preview.innerHTML = editor.options.previewRender(editor.value(), preview);
-		cm.on("update", cm.sideBySideRenderingFunction);
-	} else {
-		cm.off("update", cm.sideBySideRenderingFunction);
-	}
+    if (useSideBySideListener) {
+        preview.innerHTML = editor.options.previewRender(editor.value(), preview);
+        cm.on("update", cm.sideBySideRenderingFunction);
+    } else {
+        cm.off("update", cm.sideBySideRenderingFunction);
+    }
 }
 
 
@@ -13318,1070 +12481,1070 @@ function toggleSideBySide(editor) {
  * Preview action.
  */
 function togglePreview(editor) {
-	var cm = editor.codemirror;
-	var wrapper = cm.getWrapperElement();
-	var toolbar_div = wrapper.previousSibling;
-	var toolbar = editor.toolbarElements.preview;
-	var preview = wrapper.lastChild;
-	if(!preview || !/editor-preview/.test(preview.className)) {
-		preview = document.createElement("div");
-		preview.className = "editor-preview";
-		wrapper.appendChild(preview);
-	}
-	if(/editor-preview-active/.test(preview.className)) {
-		preview.className = preview.className.replace(
-			/\s*editor-preview-active\s*/g, ""
-		);
-		toolbar.className = toolbar.className.replace(/\s*active\s*/g, "");
-		toolbar_div.className = toolbar_div.className.replace(/\s*disabled-for-preview*/g, "");
-	} else {
-		// When the preview button is clicked for the first time,
-		// give some time for the transition from editor.css to fire and the view to slide from right to left,
-		// instead of just appearing.
-		setTimeout(function() {
-			preview.className += " editor-preview-active";
-		}, 1);
-		toolbar.className += " active";
-		toolbar_div.className += " disabled-for-preview";
-	}
-	preview.innerHTML = editor.options.previewRender(editor.value(), preview);
+    var cm = editor.codemirror;
+    var wrapper = cm.getWrapperElement();
+    var toolbar_div = wrapper.previousSibling;
+    var toolbar = editor.toolbarElements.preview;
+    var preview = wrapper.lastChild;
+    if (!preview || !/editor-preview/.test(preview.className)) {
+        preview = document.createElement("div");
+        preview.className = "editor-preview";
+        wrapper.appendChild(preview);
+    }
+    if (/editor-preview-active/.test(preview.className)) {
+        preview.className = preview.className.replace(
+            /\s*editor-preview-active\s*/g, ""
+        );
+        toolbar.className = toolbar.className.replace(/\s*active\s*/g, "");
+        toolbar_div.className = toolbar_div.className.replace(/\s*disabled-for-preview*/g, "");
+    } else {
+        // When the preview button is clicked for the first time,
+        // give some time for the transition from editor.css to fire and the view to slide from right to left,
+        // instead of just appearing.
+        setTimeout(function() {
+            preview.className += " editor-preview-active";
+        }, 1);
+        toolbar.className += " active";
+        toolbar_div.className += " disabled-for-preview";
+    }
+    preview.innerHTML = editor.options.previewRender(editor.value(), preview);
 
-	// Turn off side by side if needed
-	var sidebyside = cm.getWrapperElement().nextSibling;
-	if(/editor-preview-active-side/.test(sidebyside.className))
-		toggleSideBySide(editor);
+    // Turn off side by side if needed
+    var sidebyside = cm.getWrapperElement().nextSibling;
+    if (/editor-preview-active-side/.test(sidebyside.className))
+        toggleSideBySide(editor);
 }
 
 function _replaceSelection(cm, active, startEnd) {
-	if(/editor-preview-active/.test(cm.getWrapperElement().lastChild.className))
-		return;
+    if (/editor-preview-active/.test(cm.getWrapperElement().lastChild.className))
+        return;
 
-	var text;
-	var start = startEnd[0];
-	var end = startEnd[1];
-	var startPoint = cm.getCursor("start");
-	var endPoint = cm.getCursor("end");
-	if(active) {
-		text = cm.getLine(startPoint.line);
-		start = text.slice(0, startPoint.ch);
-		end = text.slice(startPoint.ch);
-		cm.replaceRange(start + end, {
-			line: startPoint.line,
-			ch: 0
-		});
-	} else {
-		text = cm.getSelection();
-		cm.replaceSelection(start + text + end);
+    var text;
+    var start = startEnd[0];
+    var end = startEnd[1];
+    var startPoint = cm.getCursor("start");
+    var endPoint = cm.getCursor("end");
+    if (active) {
+        text = cm.getLine(startPoint.line);
+        start = text.slice(0, startPoint.ch);
+        end = text.slice(startPoint.ch);
+        cm.replaceRange(start + end, {
+            line: startPoint.line,
+            ch: 0
+        });
+    } else {
+        text = cm.getSelection();
+        cm.replaceSelection(start + text + end);
 
-		startPoint.ch += start.length;
-		if(startPoint !== endPoint) {
-			endPoint.ch += start.length;
-		}
-	}
-	cm.setSelection(startPoint, endPoint);
-	cm.focus();
+        startPoint.ch += start.length;
+        if (startPoint !== endPoint) {
+            endPoint.ch += start.length;
+        }
+    }
+    cm.setSelection(startPoint, endPoint);
+    cm.focus();
 }
 
 
 function _toggleHeading(cm, direction, size) {
-	if(/editor-preview-active/.test(cm.getWrapperElement().lastChild.className))
-		return;
+    if (/editor-preview-active/.test(cm.getWrapperElement().lastChild.className))
+        return;
 
-	var startPoint = cm.getCursor("start");
-	var endPoint = cm.getCursor("end");
-	for(var i = startPoint.line; i <= endPoint.line; i++) {
-		(function(i) {
-			var text = cm.getLine(i);
-			var currHeadingLevel = text.search(/[^#]/);
+    var startPoint = cm.getCursor("start");
+    var endPoint = cm.getCursor("end");
+    for (var i = startPoint.line; i <= endPoint.line; i++) {
+        (function(i) {
+            var text = cm.getLine(i);
+            var currHeadingLevel = text.search(/[^#]/);
 
-			if(direction !== undefined) {
-				if(currHeadingLevel <= 0) {
-					if(direction == "bigger") {
-						text = "###### " + text;
-					} else {
-						text = "# " + text;
-					}
-				} else if(currHeadingLevel == 6 && direction == "smaller") {
-					text = text.substr(7);
-				} else if(currHeadingLevel == 1 && direction == "bigger") {
-					text = text.substr(2);
-				} else {
-					if(direction == "bigger") {
-						text = text.substr(1);
-					} else {
-						text = "#" + text;
-					}
-				}
-			} else {
-				if(size == 1) {
-					if(currHeadingLevel <= 0) {
-						text = "# " + text;
-					} else if(currHeadingLevel == size) {
-						text = text.substr(currHeadingLevel + 1);
-					} else {
-						text = "# " + text.substr(currHeadingLevel + 1);
-					}
-				} else if(size == 2) {
-					if(currHeadingLevel <= 0) {
-						text = "## " + text;
-					} else if(currHeadingLevel == size) {
-						text = text.substr(currHeadingLevel + 1);
-					} else {
-						text = "## " + text.substr(currHeadingLevel + 1);
-					}
-				} else {
-					if(currHeadingLevel <= 0) {
-						text = "### " + text;
-					} else if(currHeadingLevel == size) {
-						text = text.substr(currHeadingLevel + 1);
-					} else {
-						text = "### " + text.substr(currHeadingLevel + 1);
-					}
-				}
-			}
+            if (direction !== undefined) {
+                if (currHeadingLevel <= 0) {
+                    if (direction == "bigger") {
+                        text = "###### " + text;
+                    } else {
+                        text = "# " + text;
+                    }
+                } else if (currHeadingLevel == 6 && direction == "smaller") {
+                    text = text.substr(7);
+                } else if (currHeadingLevel == 1 && direction == "bigger") {
+                    text = text.substr(2);
+                } else {
+                    if (direction == "bigger") {
+                        text = text.substr(1);
+                    } else {
+                        text = "#" + text;
+                    }
+                }
+            } else {
+                if (size == 1) {
+                    if (currHeadingLevel <= 0) {
+                        text = "# " + text;
+                    } else if (currHeadingLevel == size) {
+                        text = text.substr(currHeadingLevel + 1);
+                    } else {
+                        text = "# " + text.substr(currHeadingLevel + 1);
+                    }
+                } else if (size == 2) {
+                    if (currHeadingLevel <= 0) {
+                        text = "## " + text;
+                    } else if (currHeadingLevel == size) {
+                        text = text.substr(currHeadingLevel + 1);
+                    } else {
+                        text = "## " + text.substr(currHeadingLevel + 1);
+                    }
+                } else {
+                    if (currHeadingLevel <= 0) {
+                        text = "### " + text;
+                    } else if (currHeadingLevel == size) {
+                        text = text.substr(currHeadingLevel + 1);
+                    } else {
+                        text = "### " + text.substr(currHeadingLevel + 1);
+                    }
+                }
+            }
 
-			cm.replaceRange(text, {
-				line: i,
-				ch: 0
-			}, {
-				line: i,
-				ch: 99999999999999
-			});
-		})(i);
-	}
-	cm.focus();
+            cm.replaceRange(text, {
+                line: i,
+                ch: 0
+            }, {
+                line: i,
+                ch: 99999999999999
+            });
+        })(i);
+    }
+    cm.focus();
 }
 
 
 function _toggleLine(cm, name) {
-	if(/editor-preview-active/.test(cm.getWrapperElement().lastChild.className))
-		return;
+    if (/editor-preview-active/.test(cm.getWrapperElement().lastChild.className))
+        return;
 
-	var stat = getState(cm);
-	var startPoint = cm.getCursor("start");
-	var endPoint = cm.getCursor("end");
-	var repl = {
-		"quote": /^(\s*)\>\s+/,
-		"unordered-list": /^(\s*)(\*|\-|\+)\s+/,
-		"ordered-list": /^(\s*)\d+\.\s+/
-	};
-	var map = {
-		"quote": "> ",
-		"unordered-list": "* ",
-		"ordered-list": "1. "
-	};
-	for(var i = startPoint.line; i <= endPoint.line; i++) {
-		(function(i) {
-			var text = cm.getLine(i);
-			if(stat[name]) {
-				text = text.replace(repl[name], "$1");
-			} else {
-				text = map[name] + text;
-			}
-			cm.replaceRange(text, {
-				line: i,
-				ch: 0
-			}, {
-				line: i,
-				ch: 99999999999999
-			});
-		})(i);
-	}
-	cm.focus();
+    var stat = getState(cm);
+    var startPoint = cm.getCursor("start");
+    var endPoint = cm.getCursor("end");
+    var repl = {
+        "quote": /^(\s*)\>\s+/,
+        "unordered-list": /^(\s*)(\*|\-|\+)\s+/,
+        "ordered-list": /^(\s*)\d+\.\s+/
+    };
+    var map = {
+        "quote": "> ",
+        "unordered-list": "* ",
+        "ordered-list": "1. "
+    };
+    for (var i = startPoint.line; i <= endPoint.line; i++) {
+        (function(i) {
+            var text = cm.getLine(i);
+            if (stat[name]) {
+                text = text.replace(repl[name], "$1");
+            } else {
+                text = map[name] + text;
+            }
+            cm.replaceRange(text, {
+                line: i,
+                ch: 0
+            }, {
+                line: i,
+                ch: 99999999999999
+            });
+        })(i);
+    }
+    cm.focus();
 }
 
 function _toggleBlock(editor, type, start_chars, end_chars) {
-	if(/editor-preview-active/.test(editor.codemirror.getWrapperElement().lastChild.className))
-		return;
+    if (/editor-preview-active/.test(editor.codemirror.getWrapperElement().lastChild.className))
+        return;
 
-	end_chars = (typeof end_chars === "undefined") ? start_chars : end_chars;
-	var cm = editor.codemirror;
-	var stat = getState(cm);
+    end_chars = (typeof end_chars === "undefined") ? start_chars : end_chars;
+    var cm = editor.codemirror;
+    var stat = getState(cm);
 
-	var text;
-	var start = start_chars;
-	var end = end_chars;
+    var text;
+    var start = start_chars;
+    var end = end_chars;
 
-	var startPoint = cm.getCursor("start");
-	var endPoint = cm.getCursor("end");
+    var startPoint = cm.getCursor("start");
+    var endPoint = cm.getCursor("end");
 
-	if(stat[type]) {
-		text = cm.getLine(startPoint.line);
-		start = text.slice(0, startPoint.ch);
-		end = text.slice(startPoint.ch);
-		if(type == "bold") {
-			start = start.replace(/(\*\*|__)(?![\s\S]*(\*\*|__))/, "");
-			end = end.replace(/(\*\*|__)/, "");
-		} else if(type == "italic") {
-			start = start.replace(/(\*|_)(?![\s\S]*(\*|_))/, "");
-			end = end.replace(/(\*|_)/, "");
-		} else if(type == "strikethrough") {
-			start = start.replace(/(\*\*|~~)(?![\s\S]*(\*\*|~~))/, "");
-			end = end.replace(/(\*\*|~~)/, "");
-		}
-		cm.replaceRange(start + end, {
-			line: startPoint.line,
-			ch: 0
-		}, {
-			line: startPoint.line,
-			ch: 99999999999999
-		});
+    if (stat[type]) {
+        text = cm.getLine(startPoint.line);
+        start = text.slice(0, startPoint.ch);
+        end = text.slice(startPoint.ch);
+        if (type == "bold") {
+            start = start.replace(/(\*\*|__)(?![\s\S]*(\*\*|__))/, "");
+            end = end.replace(/(\*\*|__)/, "");
+        } else if (type == "italic") {
+            start = start.replace(/(\*|_)(?![\s\S]*(\*|_))/, "");
+            end = end.replace(/(\*|_)/, "");
+        } else if (type == "strikethrough") {
+            start = start.replace(/(\*\*|~~)(?![\s\S]*(\*\*|~~))/, "");
+            end = end.replace(/(\*\*|~~)/, "");
+        }
+        cm.replaceRange(start + end, {
+            line: startPoint.line,
+            ch: 0
+        }, {
+            line: startPoint.line,
+            ch: 99999999999999
+        });
 
-		if(type == "bold" || type == "strikethrough") {
-			startPoint.ch -= 2;
-			if(startPoint !== endPoint) {
-				endPoint.ch -= 2;
-			}
-		} else if(type == "italic") {
-			startPoint.ch -= 1;
-			if(startPoint !== endPoint) {
-				endPoint.ch -= 1;
-			}
-		}
-	} else {
-		text = cm.getSelection();
-		if(type == "bold") {
-			text = text.split("**").join("");
-			text = text.split("__").join("");
-		} else if(type == "italic") {
-			text = text.split("*").join("");
-			text = text.split("_").join("");
-		} else if(type == "strikethrough") {
-			text = text.split("~~").join("");
-		}
-		cm.replaceSelection(start + text + end);
+        if (type == "bold" || type == "strikethrough") {
+            startPoint.ch -= 2;
+            if (startPoint !== endPoint) {
+                endPoint.ch -= 2;
+            }
+        } else if (type == "italic") {
+            startPoint.ch -= 1;
+            if (startPoint !== endPoint) {
+                endPoint.ch -= 1;
+            }
+        }
+    } else {
+        text = cm.getSelection();
+        if (type == "bold") {
+            text = text.split("**").join("");
+            text = text.split("__").join("");
+        } else if (type == "italic") {
+            text = text.split("*").join("");
+            text = text.split("_").join("");
+        } else if (type == "strikethrough") {
+            text = text.split("~~").join("");
+        }
+        cm.replaceSelection(start + text + end);
 
-		startPoint.ch += start_chars.length;
-		endPoint.ch = startPoint.ch + text.length;
-	}
+        startPoint.ch += start_chars.length;
+        endPoint.ch = startPoint.ch + text.length;
+    }
 
-	cm.setSelection(startPoint, endPoint);
-	cm.focus();
+    cm.setSelection(startPoint, endPoint);
+    cm.focus();
 }
 
 function _cleanBlock(cm) {
-	if(/editor-preview-active/.test(cm.getWrapperElement().lastChild.className))
-		return;
+    if (/editor-preview-active/.test(cm.getWrapperElement().lastChild.className))
+        return;
 
-	var startPoint = cm.getCursor("start");
-	var endPoint = cm.getCursor("end");
-	var text;
+    var startPoint = cm.getCursor("start");
+    var endPoint = cm.getCursor("end");
+    var text;
 
-	for(var line = startPoint.line; line <= endPoint.line; line++) {
-		text = cm.getLine(line);
-		text = text.replace(/^[ ]*([# ]+|\*|\-|[> ]+|[0-9]+(.|\)))[ ]*/, "");
+    for (var line = startPoint.line; line <= endPoint.line; line++) {
+        text = cm.getLine(line);
+        text = text.replace(/^[ ]*([# ]+|\*|\-|[> ]+|[0-9]+(.|\)))[ ]*/, "");
 
-		cm.replaceRange(text, {
-			line: line,
-			ch: 0
-		}, {
-			line: line,
-			ch: 99999999999999
-		});
-	}
+        cm.replaceRange(text, {
+            line: line,
+            ch: 0
+        }, {
+            line: line,
+            ch: 99999999999999
+        });
+    }
 }
 
 // Merge the properties of one object into another.
 function _mergeProperties(target, source) {
-	for(var property in source) {
-		if(source.hasOwnProperty(property)) {
-			if(source[property] instanceof Array) {
-				target[property] = source[property].concat(target[property] instanceof Array ? target[property] : []);
-			} else if(
-				source[property] !== null &&
-				typeof source[property] === "object" &&
-				source[property].constructor === Object
-			) {
-				target[property] = _mergeProperties(target[property] || {}, source[property]);
-			} else {
-				target[property] = source[property];
-			}
-		}
-	}
+    for (var property in source) {
+        if (source.hasOwnProperty(property)) {
+            if (source[property] instanceof Array) {
+                target[property] = source[property].concat(target[property] instanceof Array ? target[property] : []);
+            } else if (
+                source[property] !== null &&
+                typeof source[property] === "object" &&
+                source[property].constructor === Object
+            ) {
+                target[property] = _mergeProperties(target[property] || {}, source[property]);
+            } else {
+                target[property] = source[property];
+            }
+        }
+    }
 
-	return target;
+    return target;
 }
 
 // Merge an arbitrary number of objects into one.
 function extend(target) {
-	for(var i = 1; i < arguments.length; i++) {
-		target = _mergeProperties(target, arguments[i]);
-	}
+    for (var i = 1; i < arguments.length; i++) {
+        target = _mergeProperties(target, arguments[i]);
+    }
 
-	return target;
+    return target;
 }
 
 /* The right word count in respect for CJK. */
 function wordCount(data) {
-	var pattern = /[a-zA-Z0-9_\u0392-\u03c9]+|[\u4E00-\u9FFF\u3400-\u4dbf\uf900-\ufaff\u3040-\u309f\uac00-\ud7af]+/g;
-	var m = data.match(pattern);
-	var count = 0;
-	if(m === null) return count;
-	for(var i = 0; i < m.length; i++) {
-		if(m[i].charCodeAt(0) >= 0x4E00) {
-			count += m[i].length;
-		} else {
-			count += 1;
-		}
-	}
-	return count;
+    var pattern = /[a-zA-Z0-9_\u0392-\u03c9]+|[\u4E00-\u9FFF\u3400-\u4dbf\uf900-\ufaff\u3040-\u309f\uac00-\ud7af]+/g;
+    var m = data.match(pattern);
+    var count = 0;
+    if (m === null) return count;
+    for (var i = 0; i < m.length; i++) {
+        if (m[i].charCodeAt(0) >= 0x4E00) {
+            count += m[i].length;
+        } else {
+            count += 1;
+        }
+    }
+    return count;
 }
 
 var toolbarBuiltInButtons = {
-	"bold": {
-		name: "bold",
-		action: toggleBold,
-		className: "fa fa-bold",
-		title: "Bold",
-		default: true
-	},
-	"italic": {
-		name: "italic",
-		action: toggleItalic,
-		className: "fa fa-italic",
-		title: "Italic",
-		default: true
-	},
-	"strikethrough": {
-		name: "strikethrough",
-		action: toggleStrikethrough,
-		className: "fa fa-strikethrough",
-		title: "Strikethrough"
-	},
-	"heading": {
-		name: "heading",
-		action: toggleHeadingSmaller,
-		className: "fa fa-header",
-		title: "Heading",
-		default: true
-	},
-	"heading-smaller": {
-		name: "heading-smaller",
-		action: toggleHeadingSmaller,
-		className: "fa fa-header fa-header-x fa-header-smaller",
-		title: "Smaller Heading"
-	},
-	"heading-bigger": {
-		name: "heading-bigger",
-		action: toggleHeadingBigger,
-		className: "fa fa-header fa-header-x fa-header-bigger",
-		title: "Bigger Heading"
-	},
-	"heading-1": {
-		name: "heading-1",
-		action: toggleHeading1,
-		className: "fa fa-header fa-header-x fa-header-1",
-		title: "Big Heading"
-	},
-	"heading-2": {
-		name: "heading-2",
-		action: toggleHeading2,
-		className: "fa fa-header fa-header-x fa-header-2",
-		title: "Medium Heading"
-	},
-	"heading-3": {
-		name: "heading-3",
-		action: toggleHeading3,
-		className: "fa fa-header fa-header-x fa-header-3",
-		title: "Small Heading"
-	},
-	"separator-1": {
-		name: "separator-1"
-	},
-	"code": {
-		name: "code",
-		action: toggleCodeBlock,
-		className: "fa fa-code",
-		title: "Code"
-	},
-	"quote": {
-		name: "quote",
-		action: toggleBlockquote,
-		className: "fa fa-quote-left",
-		title: "Quote",
-		default: true
-	},
-	"unordered-list": {
-		name: "unordered-list",
-		action: toggleUnorderedList,
-		className: "fa fa-list-ul",
-		title: "Generic List",
-		default: true
-	},
-	"ordered-list": {
-		name: "ordered-list",
-		action: toggleOrderedList,
-		className: "fa fa-list-ol",
-		title: "Numbered List",
-		default: true
-	},
-	"clean-block": {
-		name: "clean-block",
-		action: cleanBlock,
-		className: "fa fa-eraser fa-clean-block",
-		title: "Clean block"
-	},
-	"separator-2": {
-		name: "separator-2"
-	},
-	"link": {
-		name: "link",
-		action: drawLink,
-		className: "fa fa-link",
-		title: "Create Link",
-		default: true
-	},
-	"image": {
-		name: "image",
-		action: drawImage,
-		className: "fa fa-picture-o",
-		title: "Insert Image",
-		default: true
-	},
-	"table": {
-		name: "table",
-		action: drawTable,
-		className: "fa fa-table",
-		title: "Insert Table"
-	},
-	"horizontal-rule": {
-		name: "horizontal-rule",
-		action: drawHorizontalRule,
-		className: "fa fa-minus",
-		title: "Insert Horizontal Line"
-	},
-	"separator-3": {
-		name: "separator-3"
-	},
-	"preview": {
-		name: "preview",
-		action: togglePreview,
-		className: "fa fa-eye no-disable",
-		title: "Toggle Preview",
-		default: true
-	},
-	"side-by-side": {
-		name: "side-by-side",
-		action: toggleSideBySide,
-		className: "fa fa-columns no-disable no-mobile",
-		title: "Toggle Side by Side",
-		default: true
-	},
-	"fullscreen": {
-		name: "fullscreen",
-		action: toggleFullScreen,
-		className: "fa fa-arrows-alt no-disable no-mobile",
-		title: "Toggle Fullscreen",
-		default: true
-	},
-	"separator-4": {
-		name: "separator-4"
-	},
-	"guide": {
-		name: "guide",
-		action: "http://nextstepwebs.github.io/simplemde-markdown-editor/markdown-guide",
-		className: "fa fa-question-circle",
-		title: "Markdown Guide",
-		default: true
-	},
-	"separator-5": {
-		name: "separator-5"
-	},
-	"undo": {
-		name: "undo",
-		action: undo,
-		className: "fa fa-undo no-disable",
-		title: "Undo"
-	},
-	"redo": {
-		name: "redo",
-		action: redo,
-		className: "fa fa-repeat no-disable",
-		title: "Redo"
-	}
+    "bold": {
+        name: "bold",
+        action: toggleBold,
+        className: "fa fa-bold",
+        title: "Bold",
+        default: true
+    },
+    "italic": {
+        name: "italic",
+        action: toggleItalic,
+        className: "fa fa-italic",
+        title: "Italic",
+        default: true
+    },
+    "strikethrough": {
+        name: "strikethrough",
+        action: toggleStrikethrough,
+        className: "fa fa-strikethrough",
+        title: "Strikethrough"
+    },
+    "heading": {
+        name: "heading",
+        action: toggleHeadingSmaller,
+        className: "fa fa-header",
+        title: "Heading",
+        default: true
+    },
+    "heading-smaller": {
+        name: "heading-smaller",
+        action: toggleHeadingSmaller,
+        className: "fa fa-header fa-header-x fa-header-smaller",
+        title: "Smaller Heading"
+    },
+    "heading-bigger": {
+        name: "heading-bigger",
+        action: toggleHeadingBigger,
+        className: "fa fa-header fa-header-x fa-header-bigger",
+        title: "Bigger Heading"
+    },
+    "heading-1": {
+        name: "heading-1",
+        action: toggleHeading1,
+        className: "fa fa-header fa-header-x fa-header-1",
+        title: "Big Heading"
+    },
+    "heading-2": {
+        name: "heading-2",
+        action: toggleHeading2,
+        className: "fa fa-header fa-header-x fa-header-2",
+        title: "Medium Heading"
+    },
+    "heading-3": {
+        name: "heading-3",
+        action: toggleHeading3,
+        className: "fa fa-header fa-header-x fa-header-3",
+        title: "Small Heading"
+    },
+    "separator-1": {
+        name: "separator-1"
+    },
+    "code": {
+        name: "code",
+        action: toggleCodeBlock,
+        className: "fa fa-code",
+        title: "Code"
+    },
+    "quote": {
+        name: "quote",
+        action: toggleBlockquote,
+        className: "fa fa-quote-left",
+        title: "Quote",
+        default: true
+    },
+    "unordered-list": {
+        name: "unordered-list",
+        action: toggleUnorderedList,
+        className: "fa fa-list-ul",
+        title: "Generic List",
+        default: true
+    },
+    "ordered-list": {
+        name: "ordered-list",
+        action: toggleOrderedList,
+        className: "fa fa-list-ol",
+        title: "Numbered List",
+        default: true
+    },
+    "clean-block": {
+        name: "clean-block",
+        action: cleanBlock,
+        className: "fa fa-eraser fa-clean-block",
+        title: "Clean block"
+    },
+    "separator-2": {
+        name: "separator-2"
+    },
+    "link": {
+        name: "link",
+        action: drawLink,
+        className: "fa fa-link",
+        title: "Create Link",
+        default: true
+    },
+    "image": {
+        name: "image",
+        action: drawImage,
+        className: "fa fa-picture-o",
+        title: "Insert Image",
+        default: true
+    },
+    "table": {
+        name: "table",
+        action: drawTable,
+        className: "fa fa-table",
+        title: "Insert Table"
+    },
+    "horizontal-rule": {
+        name: "horizontal-rule",
+        action: drawHorizontalRule,
+        className: "fa fa-minus",
+        title: "Insert Horizontal Line"
+    },
+    "separator-3": {
+        name: "separator-3"
+    },
+    "preview": {
+        name: "preview",
+        action: togglePreview,
+        className: "fa fa-eye no-disable",
+        title: "Toggle Preview",
+        default: true
+    },
+    "side-by-side": {
+        name: "side-by-side",
+        action: toggleSideBySide,
+        className: "fa fa-columns no-disable no-mobile",
+        title: "Toggle Side by Side",
+        default: true
+    },
+    "fullscreen": {
+        name: "fullscreen",
+        action: toggleFullScreen,
+        className: "fa fa-arrows-alt no-disable no-mobile",
+        title: "Toggle Fullscreen",
+        default: true
+    },
+    "separator-4": {
+        name: "separator-4"
+    },
+    "guide": {
+        name: "guide",
+        action: "http://nextstepwebs.github.io/simplemde-markdown-editor/markdown-guide",
+        className: "fa fa-question-circle",
+        title: "Markdown Guide",
+        default: true
+    },
+    "separator-5": {
+        name: "separator-5"
+    },
+    "undo": {
+        name: "undo",
+        action: undo,
+        className: "fa fa-undo no-disable",
+        title: "Undo"
+    },
+    "redo": {
+        name: "redo",
+        action: redo,
+        className: "fa fa-repeat no-disable",
+        title: "Redo"
+    }
 };
 
 var insertTexts = {
-	link: ["[", "](http://)"],
-	image: ["![](http://", ")"],
-	table: ["", "\n\n| Column 1 | Column 2 | Column 3 |\n| -------- | -------- | -------- |\n| Text     | Text     | Text     |\n\n"],
-	horizontalRule: ["", "\n\n-----\n\n"]
+    link: ["[", "](http://)"],
+    image: ["![](http://", ")"],
+    table: ["", "\n\n| Column 1 | Column 2 | Column 3 |\n| -------- | -------- | -------- |\n| Text     | Text     | Text     |\n\n"],
+    horizontalRule: ["", "\n\n-----\n\n"]
 };
 
 var blockStyles = {
-	"bold": "**",
-	"italic": "*"
+    "bold": "**",
+    "italic": "*"
 };
 
 /**
  * Interface of SimpleMDE.
  */
 function SimpleMDE(options) {
-	// Handle options parameter
-	options = options || {};
+    // Handle options parameter
+    options = options || {};
 
 
-	// Used later to refer to it"s parent
-	options.parent = this;
+    // Used later to refer to it"s parent
+    options.parent = this;
 
 
-	// Check if Font Awesome needs to be auto downloaded
-	var autoDownloadFA = true;
+    // Check if Font Awesome needs to be auto downloaded
+    var autoDownloadFA = true;
 
-	if(options.autoDownloadFontAwesome === false) {
-		autoDownloadFA = false;
-	}
+    if (options.autoDownloadFontAwesome === false) {
+        autoDownloadFA = false;
+    }
 
-	if(options.autoDownloadFontAwesome !== true) {
-		var styleSheets = document.styleSheets;
-		for(var i = 0; i < styleSheets.length; i++) {
-			if(!styleSheets[i].href)
-				continue;
+    if (options.autoDownloadFontAwesome !== true) {
+        var styleSheets = document.styleSheets;
+        for (var i = 0; i < styleSheets.length; i++) {
+            if (!styleSheets[i].href)
+                continue;
 
-			if(styleSheets[i].href.indexOf("//maxcdn.bootstrapcdn.com/font-awesome/") > -1) {
-				autoDownloadFA = false;
-			}
-		}
-	}
+            if (styleSheets[i].href.indexOf("//maxcdn.bootstrapcdn.com/font-awesome/") > -1) {
+                autoDownloadFA = false;
+            }
+        }
+    }
 
-	if(autoDownloadFA) {
-		var link = document.createElement("link");
-		link.rel = "stylesheet";
-		link.href = "https://maxcdn.bootstrapcdn.com/font-awesome/latest/css/font-awesome.min.css";
-		document.getElementsByTagName("head")[0].appendChild(link);
-	}
-
-
-	// Find the textarea to use
-	if(options.element) {
-		this.element = options.element;
-	} else if(options.element === null) {
-		// This means that the element option was specified, but no element was found
-		console.log("SimpleMDE: Error. No element was found.");
-		return;
-	}
+    if (autoDownloadFA) {
+        var link = document.createElement("link");
+        link.rel = "stylesheet";
+        link.href = "https://maxcdn.bootstrapcdn.com/font-awesome/latest/css/font-awesome.min.css";
+        document.getElementsByTagName("head")[0].appendChild(link);
+    }
 
 
-	// Handle toolbar
-	if(options.toolbar === undefined) {
-		// Initialize
-		options.toolbar = [];
+    // Find the textarea to use
+    if (options.element) {
+        this.element = options.element;
+    } else if (options.element === null) {
+        // This means that the element option was specified, but no element was found
+        console.log("SimpleMDE: Error. No element was found.");
+        return;
+    }
 
 
-		// Loop over the built in buttons, to get the preferred order
-		for(var key in toolbarBuiltInButtons) {
-			if(toolbarBuiltInButtons.hasOwnProperty(key)) {
-				if(key.indexOf("separator-") != -1) {
-					options.toolbar.push("|");
-				}
-
-				if(toolbarBuiltInButtons[key].default === true || (options.showIcons && options.showIcons.constructor === Array && options.showIcons.indexOf(key) != -1)) {
-					options.toolbar.push(key);
-				}
-			}
-		}
-	}
+    // Handle toolbar
+    if (options.toolbar === undefined) {
+        // Initialize
+        options.toolbar = [];
 
 
-	// Handle status bar
-	if(!options.hasOwnProperty("status")) {
-		options.status = ["autosave", "lines", "words", "cursor"];
-	}
+        // Loop over the built in buttons, to get the preferred order
+        for (var key in toolbarBuiltInButtons) {
+            if (toolbarBuiltInButtons.hasOwnProperty(key)) {
+                if (key.indexOf("separator-") != -1) {
+                    options.toolbar.push("|");
+                }
+
+                if (toolbarBuiltInButtons[key].default === true || (options.showIcons && options.showIcons.constructor === Array && options.showIcons.indexOf(key) != -1)) {
+                    options.toolbar.push(key);
+                }
+            }
+        }
+    }
 
 
-	// Add default preview rendering function
-	if(!options.previewRender) {
-		options.previewRender = function(plainText) {
-			// Note: "this" refers to the options object
-			return this.parent.markdown(plainText);
-		};
-	}
+    // Handle status bar
+    if (!options.hasOwnProperty("status")) {
+        options.status = ["autosave", "lines", "words", "cursor"];
+    }
 
 
-	// Set default options for parsing config
-	options.parsingConfig = options.parsingConfig || {};
+    // Add default preview rendering function
+    if (!options.previewRender) {
+        options.previewRender = function(plainText) {
+            // Note: "this" refers to the options object
+            return this.parent.markdown(plainText);
+        };
+    }
 
 
-	// Merging the insertTexts, with the given options
-	options.insertTexts = extend({}, insertTexts, options.insertTexts || {});
+    // Set default options for parsing config
+    options.parsingConfig = options.parsingConfig || {};
 
 
-	// Merging the blockStyles, with the given options
-	options.blockStyles = extend({}, blockStyles, options.blockStyles || {});
+    // Merging the insertTexts, with the given options
+    options.insertTexts = extend({}, insertTexts, options.insertTexts || {});
 
 
-	// Merging the shortcuts, with the given options
-	options.shortcuts = extend({}, shortcuts, options.shortcuts || {});
+    // Merging the blockStyles, with the given options
+    options.blockStyles = extend({}, blockStyles, options.blockStyles || {});
 
 
-	// Change unique_id to uniqueId for backwards compatibility
-	if(options.autosave != undefined && options.autosave.unique_id != undefined && options.autosave.unique_id != "")
-		options.autosave.uniqueId = options.autosave.unique_id;
+    // Merging the shortcuts, with the given options
+    options.shortcuts = extend({}, shortcuts, options.shortcuts || {});
 
 
-	// Update this options
-	this.options = options;
+    // Change unique_id to uniqueId for backwards compatibility
+    if (options.autosave != undefined && options.autosave.unique_id != undefined && options.autosave.unique_id != "")
+        options.autosave.uniqueId = options.autosave.unique_id;
 
 
-	// Auto render
-	this.render();
+    // Update this options
+    this.options = options;
 
 
-	// The codemirror component is only available after rendering
-	// so, the setter for the initialValue can only run after
-	// the element has been rendered
-	if(options.initialValue && (!this.options.autosave || this.options.autosave.foundSavedValue !== true)) {
-		this.value(options.initialValue);
-	}
+    // Auto render
+    this.render();
+
+
+    // The codemirror component is only available after rendering
+    // so, the setter for the initialValue can only run after
+    // the element has been rendered
+    if (options.initialValue && (!this.options.autosave || this.options.autosave.foundSavedValue !== true)) {
+        this.value(options.initialValue);
+    }
 }
 
 /**
  * Default markdown render.
  */
 SimpleMDE.prototype.markdown = function(text) {
-	if(marked) {
-		// Initialize
-		var markedOptions = {};
+    if (marked) {
+        // Initialize
+        var markedOptions = {};
 
 
-		// Update options
-		if(this.options && this.options.renderingConfig && this.options.renderingConfig.singleLineBreaks !== false) {
-			markedOptions.breaks = true;
-		}
+        // Update options
+        if (this.options && this.options.renderingConfig && this.options.renderingConfig.singleLineBreaks !== false) {
+            markedOptions.breaks = true;
+        }
 
-		if(this.options && this.options.renderingConfig && this.options.renderingConfig.codeSyntaxHighlighting === true && window.hljs) {
-			markedOptions.highlight = function(code) {
-				return window.hljs.highlightAuto(code).value;
-			};
-		}
-
-
-		// Set options
-		marked.setOptions(markedOptions);
+        if (this.options && this.options.renderingConfig && this.options.renderingConfig.codeSyntaxHighlighting === true && window.hljs) {
+            markedOptions.highlight = function(code) {
+                return window.hljs.highlightAuto(code).value;
+            };
+        }
 
 
-		// Return
-		return marked(text);
-	}
+        // Set options
+        marked.setOptions(markedOptions);
+
+
+        // Return
+        return marked(text);
+    }
 };
 
 /**
  * Render editor to the given element.
  */
 SimpleMDE.prototype.render = function(el) {
-	if(!el) {
-		el = this.element || document.getElementsByTagName("textarea")[0];
-	}
+    if (!el) {
+        el = this.element || document.getElementsByTagName("textarea")[0];
+    }
 
-	if(this._rendered && this._rendered === el) {
-		// Already rendered.
-		return;
-	}
+    if (this._rendered && this._rendered === el) {
+        // Already rendered.
+        return;
+    }
 
-	this.element = el;
-	var options = this.options;
+    this.element = el;
+    var options = this.options;
 
-	var self = this;
-	var keyMaps = {};
+    var self = this;
+    var keyMaps = {};
 
-	for(var key in options.shortcuts) {
-		// null stands for "do not bind this command"
-		if(options.shortcuts[key] !== null && bindings[key] !== null) {
-			(function(key) {
-				keyMaps[fixShortcut(options.shortcuts[key])] = function() {
-					bindings[key](self);
-				};
-			})(key);
-		}
-	}
+    for (var key in options.shortcuts) {
+        // null stands for "do not bind this command"
+        if (options.shortcuts[key] !== null && bindings[key] !== null) {
+            (function(key) {
+                keyMaps[fixShortcut(options.shortcuts[key])] = function() {
+                    bindings[key](self);
+                };
+            })(key);
+        }
+    }
 
-	keyMaps["Enter"] = "newlineAndIndentContinueMarkdownList";
-	keyMaps["Tab"] = "tabAndIndentMarkdownList";
-	keyMaps["Shift-Tab"] = "shiftTabAndUnindentMarkdownList";
-	keyMaps["Esc"] = function(cm) {
-		if(cm.getOption("fullScreen")) toggleFullScreen(self);
-	};
+    keyMaps["Enter"] = "newlineAndIndentContinueMarkdownList";
+    keyMaps["Tab"] = "tabAndIndentMarkdownList";
+    keyMaps["Shift-Tab"] = "shiftTabAndUnindentMarkdownList";
+    keyMaps["Esc"] = function(cm) {
+        if (cm.getOption("fullScreen")) toggleFullScreen(self);
+    };
 
-	document.addEventListener("keydown", function(e) {
-		e = e || window.event;
+    document.addEventListener("keydown", function(e) {
+        e = e || window.event;
 
-		if(e.keyCode == 27) {
-			if(self.codemirror.getOption("fullScreen")) toggleFullScreen(self);
-		}
-	}, false);
+        if (e.keyCode == 27) {
+            if (self.codemirror.getOption("fullScreen")) toggleFullScreen(self);
+        }
+    }, false);
 
-	var mode, backdrop;
-	if(options.spellChecker !== false) {
-		mode = "spell-checker";
-		backdrop = options.parsingConfig;
-		backdrop.name = "gfm";
-		backdrop.gitHubSpice = false;
-	} else {
-		mode = options.parsingConfig;
-		mode.name = "gfm";
-		mode.gitHubSpice = false;
-	}
+    var mode, backdrop;
+    if (options.spellChecker !== false) {
+        mode = "spell-checker";
+        backdrop = options.parsingConfig;
+        backdrop.name = "gfm";
+        backdrop.gitHubSpice = false;
+    } else {
+        mode = options.parsingConfig;
+        mode.name = "gfm";
+        mode.gitHubSpice = false;
+    }
 
-	this.codemirror = CodeMirror.fromTextArea(el, {
-		mode: mode,
-		backdrop: backdrop,
-		theme: "paper",
-		tabSize: (options.tabSize != undefined) ? options.tabSize : 2,
-		indentUnit: (options.tabSize != undefined) ? options.tabSize : 2,
-		indentWithTabs: (options.indentWithTabs === false) ? false : true,
-		lineNumbers: false,
-		autofocus: (options.autofocus === true) ? true : false,
-		extraKeys: keyMaps,
-		lineWrapping: (options.lineWrapping === false) ? false : true,
-		allowDropFileTypes: ["text/plain"],
-		placeholder: options.placeholder || el.getAttribute("placeholder") || ""
-	});
+    this.codemirror = CodeMirror.fromTextArea(el, {
+        mode: mode,
+        backdrop: backdrop,
+        theme: "paper",
+        tabSize: (options.tabSize != undefined) ? options.tabSize : 2,
+        indentUnit: (options.tabSize != undefined) ? options.tabSize : 2,
+        indentWithTabs: (options.indentWithTabs === false) ? false : true,
+        lineNumbers: false,
+        autofocus: (options.autofocus === true) ? true : false,
+        extraKeys: keyMaps,
+        lineWrapping: (options.lineWrapping === false) ? false : true,
+        allowDropFileTypes: ["text/plain"],
+        placeholder: options.placeholder || el.getAttribute("placeholder") || ""
+    });
 
-	if(options.toolbar !== false) {
-		this.createToolbar();
-	}
-	if(options.status !== false) {
-		this.createStatusbar();
-	}
-	if(options.autosave != undefined && options.autosave.enabled === true) {
-		this.autosave();
-	}
+    if (options.toolbar !== false) {
+        this.createToolbar();
+    }
+    if (options.status !== false) {
+        this.createStatusbar();
+    }
+    if (options.autosave != undefined && options.autosave.enabled === true) {
+        this.autosave();
+    }
 
-	this.createSideBySide();
+    this.createSideBySide();
 
-	this._rendered = this.element;
+    this._rendered = this.element;
 };
 
 SimpleMDE.prototype.autosave = function() {
-	if(localStorage) {
-		var simplemde = this;
+    if (localStorage) {
+        var simplemde = this;
 
-		if(this.options.autosave.uniqueId == undefined || this.options.autosave.uniqueId == "") {
-			console.log("SimpleMDE: You must set a uniqueId to use the autosave feature");
-			return;
-		}
+        if (this.options.autosave.uniqueId == undefined || this.options.autosave.uniqueId == "") {
+            console.log("SimpleMDE: You must set a uniqueId to use the autosave feature");
+            return;
+        }
 
-		if(simplemde.element.form != null && simplemde.element.form != undefined) {
-			simplemde.element.form.addEventListener("submit", function() {
-				localStorage.removeItem("smde_" + simplemde.options.autosave.uniqueId);
-			});
-		}
+        if (simplemde.element.form != null && simplemde.element.form != undefined) {
+            simplemde.element.form.addEventListener("submit", function() {
+                localStorage.removeItem("smde_" + simplemde.options.autosave.uniqueId);
+            });
+        }
 
-		if(this.options.autosave.loaded !== true) {
-			if(typeof localStorage.getItem("smde_" + this.options.autosave.uniqueId) == "string" && localStorage.getItem("smde_" + this.options.autosave.uniqueId) != "") {
-				this.codemirror.setValue(localStorage.getItem("smde_" + this.options.autosave.uniqueId));
-				this.options.autosave.foundSavedValue = true;
-			}
+        if (this.options.autosave.loaded !== true) {
+            if (typeof localStorage.getItem("smde_" + this.options.autosave.uniqueId) == "string" && localStorage.getItem("smde_" + this.options.autosave.uniqueId) != "") {
+                this.codemirror.setValue(localStorage.getItem("smde_" + this.options.autosave.uniqueId));
+                this.options.autosave.foundSavedValue = true;
+            }
 
-			this.options.autosave.loaded = true;
-		}
+            this.options.autosave.loaded = true;
+        }
 
-		localStorage.setItem("smde_" + this.options.autosave.uniqueId, simplemde.value());
+        localStorage.setItem("smde_" + this.options.autosave.uniqueId, simplemde.value());
 
-		var el = document.getElementById("autosaved");
-		if(el != null && el != undefined && el != "") {
-			var d = new Date();
-			var hh = d.getHours();
-			var m = d.getMinutes();
-			var dd = "am";
-			var h = hh;
-			if(h >= 12) {
-				h = hh - 12;
-				dd = "pm";
-			}
-			if(h == 0) {
-				h = 12;
-			}
-			m = m < 10 ? "0" + m : m;
+        var el = document.getElementById("autosaved");
+        if (el != null && el != undefined && el != "") {
+            var d = new Date();
+            var hh = d.getHours();
+            var m = d.getMinutes();
+            var dd = "am";
+            var h = hh;
+            if (h >= 12) {
+                h = hh - 12;
+                dd = "pm";
+            }
+            if (h == 0) {
+                h = 12;
+            }
+            m = m < 10 ? "0" + m : m;
 
-			el.innerHTML = "Autosaved: " + h + ":" + m + " " + dd;
-		}
+            el.innerHTML = "Autosaved: " + h + ":" + m + " " + dd;
+        }
 
-		setTimeout(function() {
-			simplemde.autosave();
-		}, this.options.autosave.delay || 10000);
-	} else {
-		console.log("SimpleMDE: localStorage not available, cannot autosave");
-	}
+        setTimeout(function() {
+            simplemde.autosave();
+        }, this.options.autosave.delay || 10000);
+    } else {
+        console.log("SimpleMDE: localStorage not available, cannot autosave");
+    }
 };
 
 SimpleMDE.prototype.clearAutosavedValue = function() {
-	if(localStorage) {
-		if(this.options.autosave == undefined || this.options.autosave.uniqueId == undefined || this.options.autosave.uniqueId == "") {
-			console.log("SimpleMDE: You must set a uniqueId to clear the autosave value");
-			return;
-		}
+    if (localStorage) {
+        if (this.options.autosave == undefined || this.options.autosave.uniqueId == undefined || this.options.autosave.uniqueId == "") {
+            console.log("SimpleMDE: You must set a uniqueId to clear the autosave value");
+            return;
+        }
 
-		localStorage.removeItem("smde_" + this.options.autosave.uniqueId);
-	} else {
-		console.log("SimpleMDE: localStorage not available, cannot autosave");
-	}
+        localStorage.removeItem("smde_" + this.options.autosave.uniqueId);
+    } else {
+        console.log("SimpleMDE: localStorage not available, cannot autosave");
+    }
 };
 
 SimpleMDE.prototype.createSideBySide = function() {
-	var cm = this.codemirror;
-	var wrapper = cm.getWrapperElement();
-	var preview = wrapper.nextSibling;
+    var cm = this.codemirror;
+    var wrapper = cm.getWrapperElement();
+    var preview = wrapper.nextSibling;
 
-	if(!preview || !/editor-preview-side/.test(preview.className)) {
-		preview = document.createElement("div");
-		preview.className = "editor-preview-side";
-		wrapper.parentNode.insertBefore(preview, wrapper.nextSibling);
-	}
+    if (!preview || !/editor-preview-side/.test(preview.className)) {
+        preview = document.createElement("div");
+        preview.className = "editor-preview-side";
+        wrapper.parentNode.insertBefore(preview, wrapper.nextSibling);
+    }
 
-	// Syncs scroll  editor -> preview
-	var cScroll = false;
-	var pScroll = false;
-	cm.on("scroll", function(v) {
-		if(cScroll) {
-			cScroll = false;
-			return;
-		}
-		pScroll = true;
-		var height = v.getScrollInfo().height - v.getScrollInfo().clientHeight;
-		var ratio = parseFloat(v.getScrollInfo().top) / height;
-		var move = (preview.scrollHeight - preview.clientHeight) * ratio;
-		preview.scrollTop = move;
-	});
+    // Syncs scroll  editor -> preview
+    var cScroll = false;
+    var pScroll = false;
+    cm.on("scroll", function(v) {
+        if (cScroll) {
+            cScroll = false;
+            return;
+        }
+        pScroll = true;
+        var height = v.getScrollInfo().height - v.getScrollInfo().clientHeight;
+        var ratio = parseFloat(v.getScrollInfo().top) / height;
+        var move = (preview.scrollHeight - preview.clientHeight) * ratio;
+        preview.scrollTop = move;
+    });
 
-	// Syncs scroll  preview -> editor
-	preview.onscroll = function() {
-		if(pScroll) {
-			pScroll = false;
-			return;
-		}
-		cScroll = true;
-		var height = preview.scrollHeight - preview.clientHeight;
-		var ratio = parseFloat(preview.scrollTop) / height;
-		var move = (cm.getScrollInfo().height - cm.getScrollInfo().clientHeight) * ratio;
-		cm.scrollTo(0, move);
-	};
-	return true;
+    // Syncs scroll  preview -> editor
+    preview.onscroll = function() {
+        if (pScroll) {
+            pScroll = false;
+            return;
+        }
+        cScroll = true;
+        var height = preview.scrollHeight - preview.clientHeight;
+        var ratio = parseFloat(preview.scrollTop) / height;
+        var move = (cm.getScrollInfo().height - cm.getScrollInfo().clientHeight) * ratio;
+        cm.scrollTo(0, move);
+    };
+    return true;
 };
 
 SimpleMDE.prototype.createToolbar = function(items) {
-	items = items || this.options.toolbar;
+    items = items || this.options.toolbar;
 
-	if(!items || items.length === 0) {
-		return;
-	}
-	var i;
-	for(i = 0; i < items.length; i++) {
-		if(toolbarBuiltInButtons[items[i]] != undefined) {
-			items[i] = toolbarBuiltInButtons[items[i]];
-		}
-	}
+    if (!items || items.length === 0) {
+        return;
+    }
+    var i;
+    for (i = 0; i < items.length; i++) {
+        if (toolbarBuiltInButtons[items[i]] != undefined) {
+            items[i] = toolbarBuiltInButtons[items[i]];
+        }
+    }
 
-	var bar = document.createElement("div");
-	bar.className = "editor-toolbar";
+    var bar = document.createElement("div");
+    bar.className = "editor-toolbar";
 
-	var self = this;
+    var self = this;
 
-	var toolbarData = {};
-	self.toolbar = items;
+    var toolbarData = {};
+    self.toolbar = items;
 
-	for(i = 0; i < items.length; i++) {
-		if(items[i].name == "guide" && self.options.toolbarGuideIcon === false)
-			continue;
+    for (i = 0; i < items.length; i++) {
+        if (items[i].name == "guide" && self.options.toolbarGuideIcon === false)
+            continue;
 
-		if(self.options.hideIcons && self.options.hideIcons.indexOf(items[i].name) != -1)
-			continue;
+        if (self.options.hideIcons && self.options.hideIcons.indexOf(items[i].name) != -1)
+            continue;
 
-		// Fullscreen does not work well on mobile devices (even tablets)
-		// In the future, hopefully this can be resolved
-		if((items[i].name == "fullscreen" || items[i].name == "side-by-side") && isMobile())
-			continue;
-
-
-		// Don't include trailing separators
-		if(items[i] === "|") {
-			var nonSeparatorIconsFollow = false;
-
-			for(var x = (i + 1); x < items.length; x++) {
-				if(items[x] !== "|") {
-					nonSeparatorIconsFollow = true;
-				}
-			}
-
-			if(!nonSeparatorIconsFollow)
-				continue;
-		}
+        // Fullscreen does not work well on mobile devices (even tablets)
+        // In the future, hopefully this can be resolved
+        if ((items[i].name == "fullscreen" || items[i].name == "side-by-side") && isMobile())
+            continue;
 
 
-		// Create the icon and append to the toolbar
-		(function(item) {
-			var el;
-			if(item === "|") {
-				el = createSep();
-			} else {
-				el = createIcon(item, self.options.toolbarTips, self.options.shortcuts);
-			}
+        // Don't include trailing separators
+        if (items[i] === "|") {
+            var nonSeparatorIconsFollow = false;
 
-			// bind events, special for info
-			if(item.action) {
-				if(typeof item.action === "function") {
-					el.onclick = function() {
-						item.action(self);
-					};
-				} else if(typeof item.action === "string") {
-					el.href = item.action;
-					el.target = "_blank";
-				}
-			}
+            for (var x = (i + 1); x < items.length; x++) {
+                if (items[x] !== "|") {
+                    nonSeparatorIconsFollow = true;
+                }
+            }
 
-			toolbarData[item.name || item] = el;
-			bar.appendChild(el);
-		})(items[i]);
-	}
+            if (!nonSeparatorIconsFollow)
+                continue;
+        }
 
-	self.toolbarElements = toolbarData;
 
-	var cm = this.codemirror;
-	cm.on("cursorActivity", function() {
-		var stat = getState(cm);
+        // Create the icon and append to the toolbar
+        (function(item) {
+            var el;
+            if (item === "|") {
+                el = createSep();
+            } else {
+                el = createIcon(item, self.options.toolbarTips, self.options.shortcuts);
+            }
 
-		for(var key in toolbarData) {
-			(function(key) {
-				var el = toolbarData[key];
-				if(stat[key]) {
-					el.className += " active";
-				} else if(key != "fullscreen" && key != "side-by-side") {
-					el.className = el.className.replace(/\s*active\s*/g, "");
-				}
-			})(key);
-		}
-	});
+            // bind events, special for info
+            if (item.action) {
+                if (typeof item.action === "function") {
+                    el.onclick = function() {
+                        item.action(self);
+                    };
+                } else if (typeof item.action === "string") {
+                    el.href = item.action;
+                    el.target = "_blank";
+                }
+            }
 
-	var cmWrapper = cm.getWrapperElement();
-	cmWrapper.parentNode.insertBefore(bar, cmWrapper);
-	return bar;
+            toolbarData[item.name || item] = el;
+            bar.appendChild(el);
+        })(items[i]);
+    }
+
+    self.toolbarElements = toolbarData;
+
+    var cm = this.codemirror;
+    cm.on("cursorActivity", function() {
+        var stat = getState(cm);
+
+        for (var key in toolbarData) {
+            (function(key) {
+                var el = toolbarData[key];
+                if (stat[key]) {
+                    el.className += " active";
+                } else if (key != "fullscreen" && key != "side-by-side") {
+                    el.className = el.className.replace(/\s*active\s*/g, "");
+                }
+            })(key);
+        }
+    });
+
+    var cmWrapper = cm.getWrapperElement();
+    cmWrapper.parentNode.insertBefore(bar, cmWrapper);
+    return bar;
 };
 
 SimpleMDE.prototype.createStatusbar = function(status) {
-	// Initialize
-	status = status || this.options.status;
-	var options = this.options;
-	var cm = this.codemirror;
+    // Initialize
+    status = status || this.options.status;
+    var options = this.options;
+    var cm = this.codemirror;
 
 
-	// Make sure the status variable is valid
-	if(!status || status.length === 0)
-		return;
+    // Make sure the status variable is valid
+    if (!status || status.length === 0)
+        return;
 
 
-	// Set up the built-in items
-	var items = [];
-	var i, onUpdate, defaultValue;
+    // Set up the built-in items
+    var items = [];
+    var i, onUpdate, defaultValue;
 
-	for(i = 0; i < status.length; i++) {
-		// Reset some values
-		onUpdate = undefined;
-		defaultValue = undefined;
-
-
-		// Handle if custom or not
-		if(typeof status[i] === "object") {
-			items.push({
-				className: status[i].className,
-				defaultValue: status[i].defaultValue,
-				onUpdate: status[i].onUpdate
-			});
-		} else {
-			var name = status[i];
-
-			if(name === "words") {
-				defaultValue = function(el) {
-					el.innerHTML = "0";
-				};
-				onUpdate = function(el) {
-					el.innerHTML = wordCount(cm.getValue());
-				};
-			} else if(name === "lines") {
-				defaultValue = function(el) {
-					el.innerHTML = "0";
-				};
-				onUpdate = function(el) {
-					el.innerHTML = cm.lineCount();
-				};
-			} else if(name === "cursor") {
-				defaultValue = function(el) {
-					el.innerHTML = "0:0";
-				};
-				onUpdate = function(el) {
-					var pos = cm.getCursor();
-					el.innerHTML = pos.line + ":" + pos.ch;
-				};
-			} else if(name === "autosave") {
-				defaultValue = function(el) {
-					if(options.autosave != undefined && options.autosave.enabled === true) {
-						el.setAttribute("id", "autosaved");
-					}
-				};
-			}
-
-			items.push({
-				className: name,
-				defaultValue: defaultValue,
-				onUpdate: onUpdate
-			});
-		}
-	}
+    for (i = 0; i < status.length; i++) {
+        // Reset some values
+        onUpdate = undefined;
+        defaultValue = undefined;
 
 
-	// Create element for the status bar
-	var bar = document.createElement("div");
-	bar.className = "editor-statusbar";
+        // Handle if custom or not
+        if (typeof status[i] === "object") {
+            items.push({
+                className: status[i].className,
+                defaultValue: status[i].defaultValue,
+                onUpdate: status[i].onUpdate
+            });
+        } else {
+            var name = status[i];
+
+            if (name === "words") {
+                defaultValue = function(el) {
+                    el.innerHTML = "0";
+                };
+                onUpdate = function(el) {
+                    el.innerHTML = wordCount(cm.getValue());
+                };
+            } else if (name === "lines") {
+                defaultValue = function(el) {
+                    el.innerHTML = "0";
+                };
+                onUpdate = function(el) {
+                    el.innerHTML = cm.lineCount();
+                };
+            } else if (name === "cursor") {
+                defaultValue = function(el) {
+                    el.innerHTML = "0:0";
+                };
+                onUpdate = function(el) {
+                    var pos = cm.getCursor();
+                    el.innerHTML = pos.line + ":" + pos.ch;
+                };
+            } else if (name === "autosave") {
+                defaultValue = function(el) {
+                    if (options.autosave != undefined && options.autosave.enabled === true) {
+                        el.setAttribute("id", "autosaved");
+                    }
+                };
+            }
+
+            items.push({
+                className: name,
+                defaultValue: defaultValue,
+                onUpdate: onUpdate
+            });
+        }
+    }
 
 
-	// Create a new span for each item
-	for(i = 0; i < items.length; i++) {
-		// Store in temporary variable
-		var item = items[i];
+    // Create element for the status bar
+    var bar = document.createElement("div");
+    bar.className = "editor-statusbar";
 
 
-		// Create span element
-		var el = document.createElement("span");
-		el.className = item.className;
+    // Create a new span for each item
+    for (i = 0; i < items.length; i++) {
+        // Store in temporary variable
+        var item = items[i];
 
 
-		// Ensure the defaultValue is a function
-		if(typeof item.defaultValue === "function") {
-			item.defaultValue(el);
-		}
+        // Create span element
+        var el = document.createElement("span");
+        el.className = item.className;
 
 
-		// Ensure the onUpdate is a function
-		if(typeof item.onUpdate === "function") {
-			// Create a closure around the span of the current action, then execute the onUpdate handler
-			this.codemirror.on("update", (function(el, item) {
-				return function() {
-					item.onUpdate(el);
-				};
-			}(el, item)));
-		}
+        // Ensure the defaultValue is a function
+        if (typeof item.defaultValue === "function") {
+            item.defaultValue(el);
+        }
 
 
-		// Append the item to the status bar
-		bar.appendChild(el);
-	}
+        // Ensure the onUpdate is a function
+        if (typeof item.onUpdate === "function") {
+            // Create a closure around the span of the current action, then execute the onUpdate handler
+            this.codemirror.on("update", (function(el, item) {
+                return function() {
+                    item.onUpdate(el);
+                };
+            }(el, item)));
+        }
 
 
-	// Insert the status bar into the DOM
-	var cmWrapper = this.codemirror.getWrapperElement();
-	cmWrapper.parentNode.insertBefore(bar, cmWrapper.nextSibling);
-	return bar;
+        // Append the item to the status bar
+        bar.appendChild(el);
+    }
+
+
+    // Insert the status bar into the DOM
+    var cmWrapper = this.codemirror.getWrapperElement();
+    cmWrapper.parentNode.insertBefore(bar, cmWrapper.nextSibling);
+    return bar;
 };
 
 /**
  * Get or set the text content.
  */
 SimpleMDE.prototype.value = function(val) {
-	if(val === undefined) {
-		return this.codemirror.getValue();
-	} else {
-		this.codemirror.getDoc().setValue(val);
-		return this;
-	}
+    if (val === undefined) {
+        return this.codemirror.getValue();
+    } else {
+        this.codemirror.getDoc().setValue(val);
+        return this;
+    }
 };
 
 
@@ -14415,101 +13578,100 @@ SimpleMDE.toggleFullScreen = toggleFullScreen;
  * Bind instance methods for exports.
  */
 SimpleMDE.prototype.toggleBold = function() {
-	toggleBold(this);
+    toggleBold(this);
 };
 SimpleMDE.prototype.toggleItalic = function() {
-	toggleItalic(this);
+    toggleItalic(this);
 };
 SimpleMDE.prototype.toggleStrikethrough = function() {
-	toggleStrikethrough(this);
+    toggleStrikethrough(this);
 };
 SimpleMDE.prototype.toggleBlockquote = function() {
-	toggleBlockquote(this);
+    toggleBlockquote(this);
 };
 SimpleMDE.prototype.toggleHeadingSmaller = function() {
-	toggleHeadingSmaller(this);
+    toggleHeadingSmaller(this);
 };
 SimpleMDE.prototype.toggleHeadingBigger = function() {
-	toggleHeadingBigger(this);
+    toggleHeadingBigger(this);
 };
 SimpleMDE.prototype.toggleHeading1 = function() {
-	toggleHeading1(this);
+    toggleHeading1(this);
 };
 SimpleMDE.prototype.toggleHeading2 = function() {
-	toggleHeading2(this);
+    toggleHeading2(this);
 };
 SimpleMDE.prototype.toggleHeading3 = function() {
-	toggleHeading3(this);
+    toggleHeading3(this);
 };
 SimpleMDE.prototype.toggleCodeBlock = function() {
-	toggleCodeBlock(this);
+    toggleCodeBlock(this);
 };
 SimpleMDE.prototype.toggleUnorderedList = function() {
-	toggleUnorderedList(this);
+    toggleUnorderedList(this);
 };
 SimpleMDE.prototype.toggleOrderedList = function() {
-	toggleOrderedList(this);
+    toggleOrderedList(this);
 };
 SimpleMDE.prototype.cleanBlock = function() {
-	cleanBlock(this);
+    cleanBlock(this);
 };
 SimpleMDE.prototype.drawLink = function() {
-	drawLink(this);
+    drawLink(this);
 };
 SimpleMDE.prototype.drawImage = function() {
-	drawImage(this);
+    drawImage(this);
 };
 SimpleMDE.prototype.drawTable = function() {
-	drawTable(this);
+    drawTable(this);
 };
 SimpleMDE.prototype.drawHorizontalRule = function() {
-	drawHorizontalRule(this);
+    drawHorizontalRule(this);
 };
 SimpleMDE.prototype.undo = function() {
-	undo(this);
+    undo(this);
 };
 SimpleMDE.prototype.redo = function() {
-	redo(this);
+    redo(this);
 };
 SimpleMDE.prototype.togglePreview = function() {
-	togglePreview(this);
+    togglePreview(this);
 };
 SimpleMDE.prototype.toggleSideBySide = function() {
-	toggleSideBySide(this);
+    toggleSideBySide(this);
 };
 SimpleMDE.prototype.toggleFullScreen = function() {
-	toggleFullScreen(this);
+    toggleFullScreen(this);
 };
 
 SimpleMDE.prototype.isPreviewActive = function() {
-	var cm = this.codemirror;
-	var wrapper = cm.getWrapperElement();
-	var preview = wrapper.lastChild;
+    var cm = this.codemirror;
+    var wrapper = cm.getWrapperElement();
+    var preview = wrapper.lastChild;
 
-	return /editor-preview-active/.test(preview.className);
+    return /editor-preview-active/.test(preview.className);
 };
 
 SimpleMDE.prototype.isSideBySideActive = function() {
-	var cm = this.codemirror;
-	var wrapper = cm.getWrapperElement();
-	var preview = wrapper.nextSibling;
+    var cm = this.codemirror;
+    var wrapper = cm.getWrapperElement();
+    var preview = wrapper.nextSibling;
 
-	return /editor-preview-active-side/.test(preview.className);
+    return /editor-preview-active-side/.test(preview.className);
 };
 
 SimpleMDE.prototype.isFullscreenActive = function() {
-	var cm = this.codemirror;
+    var cm = this.codemirror;
 
-	return cm.getOption("fullScreen");
+    return cm.getOption("fullScreen");
 };
 
 SimpleMDE.prototype.getState = function() {
-	var cm = this.codemirror;
+    var cm = this.codemirror;
 
-	return getState(cm);
+    return getState(cm);
 };
 
 module.exports = SimpleMDE;
-
-},{"./codemirror/tablist":13,"codemirror":7,"codemirror/addon/display/fullscreen.js":3,"codemirror/addon/display/placeholder.js":4,"codemirror/addon/edit/continuelist.js":5,"codemirror/addon/mode/overlay.js":6,"codemirror/mode/gfm/gfm.js":8,"codemirror/mode/markdown/markdown.js":9,"codemirror/mode/xml/xml.js":11,"marked":12,"spell-checker":1}]},{},[14])(14)
+},{"./codemirror/tablist":11,"codemirror":5,"codemirror/addon/display/fullscreen.js":1,"codemirror/addon/display/placeholder.js":2,"codemirror/addon/edit/continuelist.js":3,"codemirror/addon/mode/overlay.js":4,"codemirror/mode/gfm/gfm.js":6,"codemirror/mode/markdown/markdown.js":7,"codemirror/mode/xml/xml.js":9,"marked":10}]},{},[12])(12)
 });
