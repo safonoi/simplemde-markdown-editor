@@ -13030,16 +13030,27 @@ function SimpleMDE(options) {
         // Initialize
         options.toolbar = [];
 
-
-        // Loop over the built in buttons, to get the preferred order
-        for (var key in toolbarBuiltInButtons) {
-            if (toolbarBuiltInButtons.hasOwnProperty(key)) {
-                if (key.indexOf("separator-") != -1) {
-                    options.toolbar.push("|");
+        if (options.icons && Array.isArray(options.icons)) {
+            options.icons.forEach(function(icon) {
+                if (toolbarBuiltInButtons[icon] || icon === "|") {
+                    options.toolbar.push(icon);
                 }
 
-                if (toolbarBuiltInButtons[key].default === true || (options.showIcons && options.showIcons.constructor === Array && options.showIcons.indexOf(key) != -1)) {
-                    options.toolbar.push(key);
+            });
+        } else {
+            // Loop over the built in buttons, to get the preferred order
+            for (var key in toolbarBuiltInButtons) {
+                if (toolbarBuiltInButtons.hasOwnProperty(key)) {
+                    if (key.indexOf("separator-") != -1) {
+                        options.toolbar.push("|");
+                    }
+
+                    if (toolbarBuiltInButtons[key].default === true ||
+                        (options.showIcons && Array.isArray(options.showIcons) && options.showIcons.indexOf(key) !== -1)) {
+
+                        options.toolbar.push(key);
+                    }
+
                 }
             }
         }
@@ -13355,13 +13366,14 @@ SimpleMDE.prototype.createToolbar = function(items) {
         if ((items[i].name == "fullscreen" || items[i].name == "side-by-side") && isMobile())
             continue;
 
-
         // Don't include trailing separators
         if (items[i] === "|") {
             var nonSeparatorIconsFollow = false;
 
             for (var x = (i + 1); x < items.length; x++) {
-                if (items[x] !== "|") {
+                if (items[x] !== "|" &&
+                    (!self.options.hideIcons || self.options.hideIcons.indexOf(items[x].name) === -1)) {
+
                     nonSeparatorIconsFollow = true;
                 }
             }
