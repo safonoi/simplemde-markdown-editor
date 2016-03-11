@@ -9,7 +9,7 @@ require("codemirror/addon/mode/overlay.js");
 require("codemirror/addon/display/placeholder.js");
 require("codemirror/mode/gfm/gfm.js");
 require("codemirror/mode/xml/xml.js");
-require("spell-checker");
+//require("spell-checker");
 var marked = require("marked");
 
 
