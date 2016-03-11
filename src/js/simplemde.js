@@ -1002,18 +1002,29 @@ function SimpleMDE(options) {
         // Initialize
         options.toolbar = [];
 
-
-        // Loop over the built in buttons, to get the preferred order
-        for (var key in toolbarBuiltInButtons) {
-            if (toolbarBuiltInButtons.hasOwnProperty(key)) {
-                if (key.indexOf("separator-") != -1) {
-                    options.toolbar.push("|");
-                }
-
-                if (toolbarBuiltInButtons[key].default === true || (options.showIcons && options.showIcons.constructor === Array && options.showIcons.indexOf(key) != -1)) {
-                    options.toolbar.push(key);
-                }
+        if (options.icons && Array.isArray(options.icons)) {
+          options.icons.forEach(function (icon) {
+            if (toolbarBuiltInButtons[icon] || icon === '|') {
+              options.toolbar.push(icon);
             }
+
+          });
+        } else {
+          // Loop over the built in buttons, to get the preferred order
+          for (var key in toolbarBuiltInButtons) {
+            if (toolbarBuiltInButtons.hasOwnProperty(key)) {
+              if (key.indexOf("separator-") != -1) {
+                  options.toolbar.push("|");
+              }
+
+              if (toolbarBuiltInButtons[key].default === true ||
+                (options.showIcons && Array.isArray(options.showIcons) && options.showIcons.indexOf(key) !== -1)) {
+
+                  options.toolbar.push(key);
+              }
+
+            }
+          }
         }
     }
 
@@ -1332,7 +1343,6 @@ SimpleMDE.prototype.createToolbar = function(items) {
             var nonSeparatorIconsFollow = false;
 
             for (var x = (i + 1); x < items.length; x++) {
-                console.log(items[x]);
                 if (items[x] !== "|" &&
                   (!self.options.hideIcons || self.options.hideIcons.indexOf(items[x].name) === -1)) {
 
